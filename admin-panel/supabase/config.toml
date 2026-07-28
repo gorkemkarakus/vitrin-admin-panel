@@ -1,0 +1,55 @@
+# Her fonksiyonun JWT dogrulama modunu koda sabitler. Bu dosya olmadan bu
+# ayar sadece deploy anindaki elle verilen --no-verify-jwt bayragina bagliydi
+# — hicbir yerde kayitli degildi. Asagidaki degerler, tum fonksiyonlarin
+# Authorization header'siz gercek davranisi test edilerek (2026-07-25)
+# dogrulanan MEVCUT calisan durumu birebir yansitir; hicbiri degistirmiyor,
+# sadece gelecekte yanlislikla bozulmasini onluyor.
+
+# x-api-key / webhook-secret / telefon-tabanli kendi kimlik dogrulamasini
+# yapan, gateway seviyesinde JWT gerektirmemesi gereken fonksiyonlar:
+[functions.book-appointment]
+verify_jwt = false
+
+[functions.public-book-appointment]
+verify_jwt = false
+
+[functions.public-booking-info]
+verify_jwt = false
+
+[functions.staff-whatsapp-webhook]
+verify_jwt = false
+
+[functions.send-appointment-notification]
+verify_jwt = false
+
+[functions.process-appointment-reminders]
+verify_jwt = false
+
+# Gercek Supabase kullanici JWT'si (Authorization header) gerektiren
+# fonksiyonlar — varsayilan zaten budur, tutarlilik icin acikca yazildi.
+[functions.chatbot-context]
+verify_jwt = true
+
+[functions.chatbot-log-message]
+verify_jwt = true
+
+[functions.parse-appointment-command]
+verify_jwt = true
+
+[functions.create-team-member]
+verify_jwt = true
+
+[functions.operator-businesses]
+verify_jwt = true
+
+[functions.operator-dashboard]
+verify_jwt = true
+
+[functions.operator-services]
+verify_jwt = true
+
+[functions.operator-team]
+verify_jwt = true
+
+[functions.operator-appointments]
+verify_jwt = true

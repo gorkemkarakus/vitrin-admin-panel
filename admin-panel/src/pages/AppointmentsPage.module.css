@@ -1,0 +1,333 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.viewToggle {
+  display: inline-flex;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.viewToggleBtn,
+.viewToggleBtnActive {
+  border: none;
+  background: transparent;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.15s, color 0.15s;
+}
+
+.viewToggleBtnActive {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(43, 43, 38, 0.08);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.bannerError {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.bannerSuccess {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.bannerClose {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.bannerClose:hover {
+  opacity: 1;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 43, 38, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 24px;
+  overflow-y: auto;
+  z-index: 30;
+}
+
+.modalCard {
+  width: 100%;
+  max-width: 640px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modalHeader .bannerClose {
+  font-size: 18px;
+  color: var(--text-dim);
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.form .field {
+  margin-bottom: 0;
+}
+
+.newCustomerToggle {
+  font-size: 13px;
+  color: var(--teal);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  margin-top: 6px;
+}
+
+.formActions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.formActions button {
+  width: auto;
+  padding: 11px 20px;
+}
+
+.dateColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.dayLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--signal);
+  letter-spacing: 0.02em;
+}
+
+.todayButton {
+  width: auto;
+  background: none;
+  border: none;
+  color: var(--teal);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 9px 0;
+  margin-left: auto;
+}
+
+.todayButton:hover {
+  text-decoration: underline;
+}
+
+.dayNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dayNav button {
+  width: auto;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.dayNav input[type='date'] {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.apptList {
+  display: flex;
+  flex-direction: column;
+}
+
+.apptListHead {
+  display: grid;
+  grid-template-columns: 90px 1.6fr 1fr 1fr 130px;
+  gap: 12px;
+  padding: 0 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}
+
+.apptRow {
+  display: grid;
+  grid-template-columns: 90px 1.6fr 1fr 1fr 130px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.apptRow:last-child {
+  border-bottom: none;
+}
+
+.apptRowPast {
+  opacity: 0.5;
+}
+
+.apptTime {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.apptCustomer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.apptCustomerText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.apptCustomerName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apptCustomerPhone {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.serviceTag {
+  display: inline-block;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.apptEmployee {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.statusSelect {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.statusBadge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.statusBekliyor {
+  color: var(--warn-text);
+  background: var(--warn-bg);
+}
+
+.statusOnaylandi {
+  color: var(--info-text);
+  background: var(--info-bg);
+}
+
+.statusTamamlandi {
+  color: var(--ok-text);
+  background: var(--ok-bg);
+}
+
+.statusIptal {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+}
+
+.sourceNote {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.dateGroup {
+  margin-bottom: 20px;
+}
+
+.dateGroup:last-child {
+  margin-bottom: 0;
+}
+
+.dateGroupLabel {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  text-transform: capitalize;
+}

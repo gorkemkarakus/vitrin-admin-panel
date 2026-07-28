@@ -1,0 +1,440 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pageHead h1 {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.pageHead p {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.employeeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .employeeGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scheduleHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.scheduleHeadRow .presetRow {
+  margin-bottom: 0;
+}
+
+.cardHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cardHeadRow h2 {
+  margin-bottom: 0;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+
+.dimCell {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.employeeCard {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.employeeHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.employeeName {
+  font-family: var(--font-heading);
+  font-size: 15px;
+}
+
+.employeeTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.hashtag {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hashtagEmpty {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.categoryCheckboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.categoryChip,
+.categoryChipActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.1s;
+}
+
+.categoryChip {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+
+.categoryChip:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+  background: var(--panel);
+}
+
+.categoryChipActive {
+  background: var(--signal);
+  border: 1px solid var(--signal);
+  color: var(--signal-text);
+  box-shadow: 0 2px 10px rgba(61, 70, 50, 0.25);
+}
+
+.categoryChipActive:active,
+.categoryChip:active {
+  transform: scale(0.96);
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.existingSchedules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scheduleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 8px 6px 12px;
+}
+
+.scheduleRow strong {
+  color: var(--text);
+}
+
+.scheduleRow button {
+  background: none;
+  border: none;
+  color: var(--signal);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.addScheduleForm {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.presetRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.presetRow button {
+  width: auto;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.dayChipRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.dayChip,
+.dayChipActive {
+  width: 46px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.1s;
+}
+
+.dayChip {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+
+.dayChip:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+  background: var(--panel);
+}
+
+.dayChipActive {
+  background: var(--signal);
+  border: 1px solid var(--signal);
+  color: var(--signal-text);
+  box-shadow: 0 2px 10px rgba(61, 70, 50, 0.25);
+}
+
+.dayChipActive:active,
+.dayChip:active {
+  transform: scale(0.94);
+}
+
+.timeRow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.timeField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeField label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.timeField select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  padding: 9px 10px;
+  outline: none;
+  min-width: 90px;
+  transition: border-color 0.15s;
+}
+
+.timeField select:focus {
+  border-color: var(--signal);
+}
+
+.timeSep {
+  color: var(--text-dim);
+  padding-bottom: 9px;
+}
+
+.timeRow button {
+  width: auto;
+  padding: 9px 16px;
+  font-size: 13px;
+  margin-left: auto;
+  align-self: flex-end;
+}
+
+.blockSection {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 16px;
+}
+
+.blockSectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.blockForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.blockModeRow {
+  display: flex;
+  gap: 8px;
+}
+
+.blockModeRow button {
+  width: auto;
+  height: auto;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.blockLabelInput {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  padding: 9px 10px;
+  outline: none;
+  width: 100%;
+  max-width: 280px;
+  font-family: var(--font-body);
+}
+
+.blockLabelInput:focus {
+  border-color: var(--signal);
+}
+
+.blockRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border-radius: 999px;
+  padding: 6px 8px 6px 12px;
+}
+
+.blockRow strong {
+  color: var(--danger-text);
+}
+
+.blockRemove {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--danger-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.blockRemove:hover {
+  background: rgba(184, 72, 58, 0.15);
+}
+
+.dashedAddBtn {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--text-dim);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: var(--font-body);
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.dashedAddBtn:hover {
+  border-color: var(--signal);
+  color: var(--signal);
+}

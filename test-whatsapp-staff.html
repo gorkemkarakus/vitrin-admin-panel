@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Vitrin - Personel WhatsApp Simülatörü</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #0f1115;
+    color: #e8e8ea;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 14px 20px;
+    background: #171a21;
+    border-bottom: 1px solid #2a2e38;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+  }
+  header .sub {
+    font-size: 12px;
+    color: #8a8f9c;
+  }
+  #phoneRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #phoneInput {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #2a2e38;
+    background: #0f1115;
+    color: #e8e8ea;
+    font-size: 13px;
+    width: 150px;
+  }
+  #resetBtn {
+    background: #2a2e38;
+    color: #e8e8ea;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  #resetBtn:hover { background: #383e4a; }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .msg {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.4;
+    font-size: 14px;
+    white-space: pre-wrap;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: #25d366;
+    color: #0b1a12;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: #1f232c;
+    border: 1px solid #2a2e38;
+    border-bottom-left-radius: 4px;
+  }
+  .msg.system {
+    align-self: center;
+    color: #8a8f9c;
+    font-size: 12px;
+    background: none;
+  }
+  .msg.error {
+    align-self: flex-start;
+    background: #3a1f1f;
+    border: 1px solid #5a2c2c;
+    color: #ffb3b3;
+  }
+  #inputRow {
+    display: flex;
+    padding: 14px 20px;
+    gap: 10px;
+    background: #171a21;
+    border-top: 1px solid #2a2e38;
+  }
+  #messageInput {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid #2a2e38;
+    background: #0f1115;
+    color: #e8e8ea;
+    font-size: 14px;
+    outline: none;
+  }
+  #messageInput:focus { border-color: #25d366; }
+  #sendBtn {
+    background: #25d366;
+    color: #0b1a12;
+    border: none;
+    padding: 0 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #sendBtn:hover { background: #3ee079; }
+  #sendBtn:disabled { background: #4a4a4a; cursor: not-allowed; }
+  .typing {
+    align-self: flex-start;
+    color: #8a8f9c;
+    font-size: 13px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Personel WhatsApp Simülatörü</h1>
+      <div class="sub">Gerçek WhatsApp'a henüz bağlı değil — bu sayfa doğrudan staff-whatsapp-webhook fonksiyonunu çağırır.</div>
+    </div>
+    <div id="phoneRow">
+      <input id="phoneInput" type="text" placeholder="ör. 05551234567">
+      <button id="resetBtn">Konuşmayı temizle</button>
+    </div>
+  </header>
+  <div id="messages"></div>
+  <div id="inputRow">
+    <input id="messageInput" type="text" placeholder="Personel olarak yazın... ör. yarına 15:00'te Ayşe için manikür yaz" autocomplete="off">
+    <button id="sendBtn">Gönder</button>
+  </div>
+
+<script>
+const FUNCTION_URL = 'https://rllvmyriopaulcmmynbe.supabase.co/functions/v1/staff-whatsapp-webhook';
+const ANON_KEY = 'sb_publishable_CqpxvhHpayp_4Ad45ZZYHw_ti3Vo9ak';
+
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const phoneInput = document.getElementById('phoneInput');
+
+phoneInput.value = localStorage.getItem('vitrin_staff_test_phone') || '';
+phoneInput.addEventListener('change', () => {
+  localStorage.setItem('vitrin_staff_test_phone', phoneInput.value.trim());
+});
+
+function addMessage(type, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  const phone = phoneInput.value.trim();
+  if (!text) return;
+  if (!phone) {
+    addMessage('error', 'Önce yukarıya, profilinize kayıtlı telefon numarasını yazın.');
+    return;
+  }
+  localStorage.setItem('vitrin_staff_test_phone', phone);
+
+  addMessage('user', text);
+  inputEl.value = '';
+  sendBtn.disabled = true;
+
+  const typingEl = addMessage('typing', 'Bot yazıyor...');
+  typingEl.classList.add('typing');
+
+  try {
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': ANON_KEY,
+        'Authorization': 'Bearer ' + ANON_KEY,
+      },
+      body: JSON.stringify({ phone, message: text }),
+    });
+
+    typingEl.remove();
+
+    if (!res.ok) {
+      addMessage('error', 'Hata: HTTP ' + res.status);
+      return;
+    }
+
+    const data = await res.json();
+    addMessage('bot', data.reply || data.error || '(boş cevap)');
+  } catch (err) {
+    typingEl.remove();
+    addMessage('error', 'Bağlantı hatası: ' + err.message);
+  } finally {
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendMessage();
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  messagesEl.innerHTML = '';
+  addMessage('system', 'Konuşma temizlendi (sunucudaki bekleyen taslak silinmedi — "iptal" yazarak temizleyebilirsin).');
+});
+
+addMessage('system', 'Yukarıya profilinize kayıtlı WhatsApp numarasını yazıp mesaj göndermeye başlayabilirsiniz.');
+inputEl.focus();
+</script>
+</body>
+</html>

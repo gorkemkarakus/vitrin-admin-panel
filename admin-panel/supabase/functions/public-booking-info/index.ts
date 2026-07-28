@@ -1,0 +1,133 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders, json } from '../_shared/http.ts'
+import { SLOT_MINUTES, eligibleDayHours, listOpenSlots, istanbulParts } from '../_shared/availability.ts'
+
+// Herkese açık — x-api-key YOK. business_id, URL'de zaten görünür olan
+// (dolayısıyla ifşası güvenli) slug'dan çözülür. Bu fonksiyon SADECE okuma
+// yapar; hiçbir zaman gelir veya başka müşteri bilgisi döndürmez — sadece
+// işletme adı, aktif hizmetler/kategoriler, (bir hizmet seçildiyse) o
+// hizmeti verebilecek aktif personelin adı, ve (istenirse) bir günün boş
+// saatleri.
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+
+  let body: { slug?: string; service_id?: string; employee_id?: string; date?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return json({ error: 'Geçersiz istek gövdesi' }, 400)
+  }
+
+  const { slug, service_id, employee_id, date } = body
+  if (!slug) return json({ error: 'slug zorunlu' }, 400)
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const admin = createClient(supabaseUrl, serviceKey)
+
+  const { data: business } = await admin.from('businesses').select('id, name').eq('slug', slug).maybeSingle()
+  if (!business) return json({ error: 'İşletme bulunamadı' }, 404)
+
+  const [{ data: services }, { data: categories }] = await Promise.all([
+    admin
+      .from('services')
+      .select('id, name, price, duration_minutes, description, category_id')
+      .eq('business_id', business.id)
+      .eq('is_active', true)
+      .order('name'),
+    admin.from('service_categories').select('id, name').eq('business_id', business.id).order('name'),
+  ])
+
+  const response: Record<string, unknown> = {
+    business: { name: business.name },
+    services: services ?? [],
+    categories: categories ?? [],
+  }
+
+  if (!service_id) return json(response, 200)
+
+  const { data: service } = await admin
+    .from('services')
+    .select('id, duration_minutes, category_id')
+    .eq('business_id', business.id)
+    .eq('id', service_id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!service) return json({ error: 'Hizmet bulunamadı' }, 404)
+
+  const { data: activeProfiles } = await admin
+    .from('profiles')
+    .select('id, full_name')
+    .eq('business_id', business.id)
+    .eq('is_active', true)
+
+  let eligibleIds = (activeProfiles ?? []).map((p) => p.id)
+  if (service.category_id) {
+    const { data: empCats } = await admin
+      .from('employee_categories')
+      .select('profile_id')
+      .eq('category_id', service.category_id)
+    const categoryIds = new Set((empCats ?? []).map((e) => e.profile_id))
+    eligibleIds = eligibleIds.filter((id) => categoryIds.has(id))
+  }
+
+  if (!date) {
+    // Sadece hizmet seçildi, tarih henüz seçilmedi — uzman listesini döndür.
+    // "specialty" musterinin uydurma bir etiket degil, calisanin GERCEKTEN
+    // baglı oldugu hizmet kategorilerinden turetiliyor.
+    const { data: allEmpCats } = await admin
+      .from('employee_categories')
+      .select('profile_id, category_id')
+      .in('profile_id', eligibleIds)
+    const categoryNameById = new Map((categories ?? []).map((c) => [c.id, c.name]))
+
+    response.employees = eligibleIds.map((id) => {
+      const specialties = (allEmpCats ?? [])
+        .filter((ec) => ec.profile_id === id)
+        .map((ec) => categoryNameById.get(ec.category_id))
+        .filter((name): name is string => Boolean(name))
+      return {
+        id,
+        full_name: activeProfiles?.find((p) => p.id === id)?.full_name ?? 'Uzman',
+        specialty: specialties.length > 0 ? specialties.join(', ') : null,
+      }
+    })
+    return json(response, 200)
+  }
+
+  // Musteri belirli bir uzman sectiyse slotlari SADECE o kisiye gore hesapla.
+  const slotEligibleIds = employee_id && eligibleIds.includes(employee_id) ? [employee_id] : eligibleIds
+  const duration = service.duration_minutes ?? SLOT_MINUTES
+
+  if (slotEligibleIds.length === 0) {
+    response.date = date
+    response.slots = []
+    response.outside_hours = null
+  } else {
+    const { data: schedules } = await admin
+      .from('employee_schedules')
+      .select('profile_id, day_of_week, starts_at, ends_at')
+      .in('profile_id', slotEligibleIds)
+    const { data: timeBlocks } = await admin
+      .from('employee_time_blocks')
+      .select('profile_id, day_of_week, block_date, starts_at, ends_at')
+      .in('profile_id', slotEligibleIds)
+    const { data: appointments } = await admin
+      .from('appointments')
+      .select('employee_id, scheduled_at, duration_minutes, status, source')
+      .eq('business_id', business.id)
+      .neq('status', 'iptal')
+
+    const day = new Date(`${date}T00:00:00+03:00`)
+    const { dayOfWeek } = istanbulParts(day)
+    const dayHours = eligibleDayHours(dayOfWeek, slotEligibleIds, schedules ?? [])
+
+    response.date = date
+    response.slots = listOpenSlots(day, slotEligibleIds, duration, schedules ?? [], appointments ?? [], timeBlocks ?? [])
+    response.outside_hours = dayHours ? null : { starts_at: null, ends_at: null }
+  }
+
+  return json(response, 200)
+})

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Vitrin - Chatbot Test</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #0f1115;
+    color: #e8e8ea;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 14px 20px;
+    background: #171a21;
+    border-bottom: 1px solid #2a2e38;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+  }
+  header .sub {
+    font-size: 12px;
+    color: #8a8f9c;
+  }
+  #resetBtn {
+    background: #2a2e38;
+    color: #e8e8ea;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  #resetBtn:hover { background: #383e4a; }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .msg {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.4;
+    font-size: 14px;
+    white-space: pre-wrap;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: #ff7a2f;
+    color: #1a1a1a;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: #1f232c;
+    border: 1px solid #2a2e38;
+    border-bottom-left-radius: 4px;
+  }
+  .msg.system {
+    align-self: center;
+    color: #8a8f9c;
+    font-size: 12px;
+    background: none;
+  }
+  .msg.error {
+    align-self: flex-start;
+    background: #3a1f1f;
+    border: 1px solid #5a2c2c;
+    color: #ffb3b3;
+  }
+  #inputRow {
+    display: flex;
+    padding: 14px 20px;
+    gap: 10px;
+    background: #171a21;
+    border-top: 1px solid #2a2e38;
+  }
+  #messageInput {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid #2a2e38;
+    background: #0f1115;
+    color: #e8e8ea;
+    font-size: 14px;
+    outline: none;
+  }
+  #messageInput:focus { border-color: #ff7a2f; }
+  #sendBtn {
+    background: #ff7a2f;
+    color: #1a1a1a;
+    border: none;
+    padding: 0 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #sendBtn:hover { background: #ff8f4d; }
+  #sendBtn:disabled { background: #4a4a4a; cursor: not-allowed; }
+  .typing {
+    align-self: flex-start;
+    color: #8a8f9c;
+    font-size: 13px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Vitrin Chatbot Testi</h1>
+      <div class="sub" id="phoneLabel"></div>
+    </div>
+    <button id="resetBtn">Yeni Konuşma</button>
+  </header>
+  <div id="messages"></div>
+  <div id="inputRow">
+    <input id="messageInput" type="text" placeholder="Mesajınızı yazın..." autocomplete="off">
+    <button id="sendBtn">Gönder</button>
+  </div>
+
+<script>
+const WEBHOOK_URL = 'http://localhost:5678/webhook/chatbot';
+
+function getPhone() {
+  let phone = localStorage.getItem('vitrin_test_phone');
+  if (!phone) {
+    phone = '+90555' + Math.floor(1000000 + Math.random() * 8999999);
+    localStorage.setItem('vitrin_test_phone', phone);
+  }
+  return phone;
+}
+
+function resetPhone() {
+  const phone = '+90555' + Math.floor(1000000 + Math.random() * 8999999);
+  localStorage.setItem('vitrin_test_phone', phone);
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('phoneLabel').textContent = 'Test müşteri: ' + phone;
+  addMessage('system', 'Yeni bir konuşma başlatıldı (' + phone + ')');
+  return phone;
+}
+
+let customerPhone = getPhone();
+document.getElementById('phoneLabel').textContent = 'Test müşteri: ' + customerPhone;
+
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function addMessage(type, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  addMessage('user', text);
+  inputEl.value = '';
+  sendBtn.disabled = true;
+
+  const typingEl = addMessage('typing', 'Bot yazıyor...');
+  typingEl.classList.add('typing');
+
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_phone: customerPhone,
+        customer_name: 'Test Kullanıcı',
+        message: text,
+      }),
+    });
+
+    typingEl.remove();
+
+    if (!res.ok) {
+      addMessage('error', 'Hata: HTTP ' + res.status);
+      return;
+    }
+
+    const data = await res.json();
+    addMessage('bot', data.reply || '(boş cevap)');
+  } catch (err) {
+    typingEl.remove();
+    addMessage('error', 'Bağlantı hatası: ' + err.message + ' (n8n çalışıyor mu? http://localhost:5678)');
+  } finally {
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendMessage();
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  customerPhone = resetPhone();
+});
+
+addMessage('system', 'Konuşmaya başlayabilirsin. Aynı tarayıcıda kaldığın sürece bot geçmişi hatırlar.');
+inputEl.focus();
+</script>
+</body>
+</html>
