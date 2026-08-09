@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
-import { sha256Hex } from '../_shared/crypto.ts'
+import { resolveBusiness } from '../_shared/resolveBusiness.ts'
 import {
   SLOT_MINUTES,
   toMinutes,
@@ -18,21 +18,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  const apiKey = req.headers.get('x-api-key')
-  if (!apiKey) return json({ error: 'x-api-key başlığı eksik' }, 401)
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceKey)
-
-  const keyHash = await sha256Hex(apiKey)
-  const { data: business, error: bizErr } = await admin
-    .from('businesses')
-    .select('id')
-    .eq('api_key_hash', keyHash)
-    .maybeSingle()
-
-  if (bizErr || !business) return json({ error: 'Geçersiz API anahtarı' }, 401)
 
   let body: {
     customer_name?: string
@@ -45,12 +33,16 @@ Deno.serve(async (req) => {
     scheduled_at?: string
     source_note?: string
     date_warning?: string | null
+    phone_number_id?: string
   }
   try {
     body = await req.json()
   } catch {
     return json({ error: 'Geçersiz istek gövdesi' }, 400)
   }
+
+  const business = await resolveBusiness(admin, req, body.phone_number_id)
+  if (!business) return json({ error: 'Geçersiz API anahtarı' }, 401)
 
   const {
     customer_name,
@@ -128,9 +120,8 @@ Deno.serve(async (req) => {
 
   const requestedStart = new Date(scheduled_at)
 
-  const serviceCols = 'id, name, duration_minutes, category_id'
-  let service: { id: string; name: string; duration_minutes: number | null; category_id: string | null } | null =
-    null
+  const serviceCols = 'id, name, duration_minutes'
+  let service: { id: string; name: string; duration_minutes: number | null } | null = null
 
   if (service_id) {
     const { data } = await admin
@@ -173,13 +164,12 @@ Deno.serve(async (req) => {
     business.id,
   )
   let eligibleIds: string[]
-  if (service.category_id) {
-    const { data: empCats } = await admin
-      .from('employee_categories')
-      .select('profile_id')
-      .eq('category_id', service.category_id)
-    eligibleIds = (empCats ?? []).map((e) => e.profile_id)
+  const { data: empSvcs } = await admin.from('employee_services').select('profile_id').eq('service_id', service.id)
+  if (empSvcs && empSvcs.length > 0) {
+    eligibleIds = empSvcs.map((e) => e.profile_id)
   } else {
+    // Bu hizmete hic kimse atanmamissa herkes uygun sayilir (bkz.
+    // EmployeeDetailPage.tsx "Verdigi Hizmetler").
     eligibleIds = (allProfiles ?? []).map((p) => p.id)
   }
 

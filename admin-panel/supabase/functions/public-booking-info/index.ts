@@ -5,9 +5,8 @@ import { SLOT_MINUTES, eligibleDayHours, listOpenSlots, istanbulParts } from '..
 // Herkese açık — x-api-key YOK. business_id, URL'de zaten görünür olan
 // (dolayısıyla ifşası güvenli) slug'dan çözülür. Bu fonksiyon SADECE okuma
 // yapar; hiçbir zaman gelir veya başka müşteri bilgisi döndürmez — sadece
-// işletme adı, aktif hizmetler/kategoriler, (bir hizmet seçildiyse) o
-// hizmeti verebilecek aktif personelin adı, ve (istenirse) bir günün boş
-// saatleri.
+// işletme adı, aktif hizmetler, (bir hizmet seçildiyse) o hizmeti
+// verebilecek aktif personelin adı, ve (istenirse) bir günün boş saatleri.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
@@ -29,27 +28,23 @@ Deno.serve(async (req) => {
   const { data: business } = await admin.from('businesses').select('id, name').eq('slug', slug).maybeSingle()
   if (!business) return json({ error: 'İşletme bulunamadı' }, 404)
 
-  const [{ data: services }, { data: categories }] = await Promise.all([
-    admin
-      .from('services')
-      .select('id, name, price, duration_minutes, description, category_id')
-      .eq('business_id', business.id)
-      .eq('is_active', true)
-      .order('name'),
-    admin.from('service_categories').select('id, name').eq('business_id', business.id).order('name'),
-  ])
+  const { data: services } = await admin
+    .from('services')
+    .select('id, name, price, duration_minutes, description')
+    .eq('business_id', business.id)
+    .eq('is_active', true)
+    .order('name')
 
   const response: Record<string, unknown> = {
     business: { name: business.name },
     services: services ?? [],
-    categories: categories ?? [],
   }
 
   if (!service_id) return json(response, 200)
 
   const { data: service } = await admin
     .from('services')
-    .select('id, duration_minutes, category_id')
+    .select('id, duration_minutes')
     .eq('business_id', business.id)
     .eq('id', service_id)
     .eq('is_active', true)
@@ -64,29 +59,28 @@ Deno.serve(async (req) => {
     .eq('is_active', true)
 
   let eligibleIds = (activeProfiles ?? []).map((p) => p.id)
-  if (service.category_id) {
-    const { data: empCats } = await admin
-      .from('employee_categories')
-      .select('profile_id')
-      .eq('category_id', service.category_id)
-    const categoryIds = new Set((empCats ?? []).map((e) => e.profile_id))
-    eligibleIds = eligibleIds.filter((id) => categoryIds.has(id))
+  const { data: empSvcs } = await admin.from('employee_services').select('profile_id').eq('service_id', service.id)
+  if (empSvcs && empSvcs.length > 0) {
+    // Bu hizmete hic kimse atanmamissa herkes uygun sayilir (bkz.
+    // EmployeeDetailPage.tsx "Verdigi Hizmetler").
+    const assignedIds = new Set(empSvcs.map((e) => e.profile_id))
+    eligibleIds = eligibleIds.filter((id) => assignedIds.has(id))
   }
 
   if (!date) {
     // Sadece hizmet seçildi, tarih henüz seçilmedi — uzman listesini döndür.
     // "specialty" musterinin uydurma bir etiket degil, calisanin GERCEKTEN
-    // baglı oldugu hizmet kategorilerinden turetiliyor.
-    const { data: allEmpCats } = await admin
-      .from('employee_categories')
-      .select('profile_id, category_id')
+    // verebildigi hizmetlerden (employee_services) turetiliyor.
+    const { data: allEmpSvcs } = await admin
+      .from('employee_services')
+      .select('profile_id, service_id')
       .in('profile_id', eligibleIds)
-    const categoryNameById = new Map((categories ?? []).map((c) => [c.id, c.name]))
+    const serviceNameById = new Map((services ?? []).map((s) => [s.id, s.name]))
 
     response.employees = eligibleIds.map((id) => {
-      const specialties = (allEmpCats ?? [])
-        .filter((ec) => ec.profile_id === id)
-        .map((ec) => categoryNameById.get(ec.category_id))
+      const specialties = (allEmpSvcs ?? [])
+        .filter((es) => es.profile_id === id)
+        .map((es) => serviceNameById.get(es.service_id))
         .filter((name): name is string => Boolean(name))
       return {
         id,
