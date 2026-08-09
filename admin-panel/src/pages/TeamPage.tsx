@@ -7,15 +7,9 @@ import Avatar, { colorForName } from '../components/Avatar'
 import { TrashIcon } from '../components/icons'
 import styles from './TeamPage.module.css'
 
-interface Category {
-  id: string
-  name: string
-}
-
 interface Service {
   id: string
   name: string
-  category_id: string | null
   duration_minutes: number
   price: number | null
 }
@@ -25,9 +19,9 @@ interface Employee {
   full_name: string | null
 }
 
-interface EmployeeCategory {
+interface EmployeeServiceRow {
   profile_id: string
-  category_id: string
+  service_id: string
 }
 
 interface Schedule {
@@ -56,15 +50,12 @@ const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
 const WEEKDAYS = [1, 2, 3, 4, 5]
 const WEEKEND = [6, 0]
 
-const currency = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' })
-
 export default function TeamPage() {
   const navigate = useNavigate()
   const { searchQuery, setSearchPlaceholder } = useOutletContext<LayoutOutletContext>()
-  const [categories, setCategories] = useState<Category[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [employeeCategories, setEmployeeCategories] = useState<EmployeeCategory[]>([])
+  const [employeeServices, setEmployeeServices] = useState<EmployeeServiceRow[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [loading, setLoading] = useState(true)
@@ -111,23 +102,26 @@ export default function TeamPage() {
     setDraft(profileId, { ...draft, days: new Set(preset) })
   }
 
-  async function loadData() {
-    setLoading(true)
-    const [{ data: cats }, { data: svcs }, { data: profs }, { data: empCats }, { data: scheds }, { data: blocks }] =
+  // "silent=true" kucuk bir islemden (checkbox, saat ekleme/kaldirma) sonra
+  // cagrilir — veriyi arka planda tazeler ama "loading" bayragini geri true
+  // yapmaz, boylece tum sayfa her tikta bos "Yükleniyor…" yazisina donup
+  // yeniden cizilmiyor (kullanicidan gelen "sayfa yenileniyor gibi" geri
+  // bildirimi). Sadece ilk acilista gercek bir yukleme goruntusu gosterilir.
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true)
+    const [{ data: svcs }, { data: profs }, { data: empSvcs }, { data: scheds }, { data: blocks }] =
       await Promise.all([
-        supabase.from('service_categories').select('id, name').order('name'),
-        supabase.from('services').select('id, name, category_id, duration_minutes, price').order('name'),
+        supabase.from('services').select('id, name, duration_minutes, price').eq('is_active', true).order('name'),
         supabase.from('profiles').select('id, full_name').order('full_name'),
-        supabase.from('employee_categories').select('profile_id, category_id'),
+        supabase.from('employee_services').select('profile_id, service_id'),
         supabase.from('employee_schedules').select('id, profile_id, day_of_week, starts_at, ends_at'),
         supabase
           .from('employee_time_blocks')
           .select('id, profile_id, day_of_week, block_date, starts_at, ends_at, label'),
       ])
-    setCategories(cats ?? [])
     setServices(svcs ?? [])
     setEmployees(profs ?? [])
-    setEmployeeCategories(empCats ?? [])
+    setEmployeeServices(empSvcs ?? [])
     setSchedules(scheds ?? [])
     setTimeBlocks(blocks ?? [])
     setLoading(false)
@@ -142,25 +136,13 @@ export default function TeamPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleServiceCategoryChange(serviceId: string, categoryId: string) {
-    await supabase
-      .from('services')
-      .update({ category_id: categoryId || null })
-      .eq('id', serviceId)
-    await loadData()
-  }
-
-  async function toggleEmployeeCategory(profileId: string, categoryId: string, checked: boolean) {
+  async function toggleEmployeeService(profileId: string, serviceId: string, checked: boolean) {
     if (checked) {
-      await supabase.from('employee_categories').insert({ profile_id: profileId, category_id: categoryId })
+      await supabase.from('employee_services').insert({ profile_id: profileId, service_id: serviceId })
     } else {
-      await supabase
-        .from('employee_categories')
-        .delete()
-        .eq('profile_id', profileId)
-        .eq('category_id', categoryId)
+      await supabase.from('employee_services').delete().eq('profile_id', profileId).eq('service_id', serviceId)
     }
-    await loadData()
+    await loadData(true)
   }
 
   async function addSchedules(profileId: string) {
@@ -187,12 +169,12 @@ export default function TeamPage() {
       }),
     )
     setDraft(profileId, { days: new Set(), start: '', end: '' })
-    await loadData()
+    await loadData(true)
   }
 
   async function removeSchedule(id: string) {
     await supabase.from('employee_schedules').delete().eq('id', id)
-    await loadData()
+    await loadData(true)
   }
 
   async function addBlock(profileId: string) {
@@ -209,12 +191,12 @@ export default function TeamPage() {
       label: draft.label.trim() || null,
     })
     setBlockDraftFor(profileId, { mode: 'day', day: 1, date: '', start: '', end: '', label: '' })
-    await loadData()
+    await loadData(true)
   }
 
   async function removeBlock(id: string) {
     await supabase.from('employee_time_blocks').delete().eq('id', id)
-    await loadData()
+    await loadData(true)
   }
 
   if (loading) return <p style={{ color: 'var(--text-dim)' }}>Yükleniyor…</p>
@@ -223,56 +205,7 @@ export default function TeamPage() {
     <div className={styles.wrap}>
       <div className={styles.pageHead}>
         <h1>Ekip Yönetimi</h1>
-        <p>Çalışan kategorilerinizi, hizmetlerinizi ve programlarınızı tek yerden yönetin.</p>
-      </div>
-
-      <div className="card">
-        <h2 style={{ marginBottom: 16 }}>Hizmet Kategorileri</h2>
-
-        <div className={styles.chipRow}>
-          {categories.length === 0 && <span className={styles.empty}>Henüz alan yok</span>}
-          {categories.map((c) => (
-            <span className={styles.chip} key={c.id}>
-              {c.name}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="card">
-        <h2 style={{ marginBottom: 16 }}>Hizmet Eşleşmeleri</h2>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Hizmet Adı</th>
-              <th>Kategori</th>
-              <th>Süre</th>
-              <th>Fiyat</th>
-            </tr>
-          </thead>
-          <tbody>
-            {services.map((s) => (
-              <tr key={s.id}>
-                <td>{s.name}</td>
-                <td>
-                  <select
-                    value={s.category_id ?? ''}
-                    onChange={(e) => handleServiceCategoryChange(s.id, e.target.value)}
-                  >
-                    <option value="">Alan seçilmedi</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className={styles.dimCell}>{s.duration_minutes} dk</td>
-                <td className={styles.dimCell}>{s.price != null ? currency.format(s.price) : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <p>Çalışanların hangi hizmetleri verebildiğini ve çalışma programlarını tek yerden yönetin.</p>
       </div>
 
       <div className="card">
@@ -287,8 +220,8 @@ export default function TeamPage() {
           ? employees.filter((emp) => (emp.full_name ?? '').toLowerCase().includes(searchQuery.trim().toLowerCase()))
           : employees
         ).map((emp) => {
-          const empCategoryIds = new Set(
-            employeeCategories.filter((ec) => ec.profile_id === emp.id).map((ec) => ec.category_id),
+          const empServiceIds = new Set(
+            employeeServices.filter((es) => es.profile_id === emp.id).map((es) => es.service_id),
           )
           const empSchedules = schedules.filter((s) => s.profile_id === emp.id)
           const empBlocks = timeBlocks.filter((b) => b.profile_id === emp.id)
@@ -302,34 +235,35 @@ export default function TeamPage() {
                 <div>
                   <div className={styles.employeeName}>{emp.full_name ?? '—'}</div>
                   <div className={styles.employeeTags}>
-                    {categories
-                      .filter((c) => empCategoryIds.has(c.id))
-                      .map((c) => (
-                        <span key={c.id} className={styles.hashtag} style={{ color: colorForName(c.name) }}>
-                          #{c.name.replace(/\s+/g, '')}
+                    {services
+                      .filter((s) => empServiceIds.has(s.id))
+                      .map((s) => (
+                        <span key={s.id} className={styles.hashtag} style={{ color: colorForName(s.name) }}>
+                          #{s.name.replace(/\s+/g, '')}
                         </span>
                       ))}
-                    {empCategoryIds.size === 0 && <span className={styles.hashtagEmpty}>Henüz alan atanmadı</span>}
+                    {empServiceIds.size === 0 && <span className={styles.hashtagEmpty}>Henüz hizmet atanmadı</span>}
                   </div>
                 </div>
               </div>
 
+              <div className={styles.blockSectionTitle}>Verebildiği Hizmetler</div>
               <div className={styles.categoryCheckboxes}>
-                {categories.map((c) => {
-                  const active = empCategoryIds.has(c.id)
+                {services.map((s) => {
+                  const active = empServiceIds.has(s.id)
                   return (
                     <button
                       type="button"
-                      key={c.id}
+                      key={s.id}
                       className={active ? styles.categoryChipActive : styles.categoryChip}
-                      onClick={() => toggleEmployeeCategory(emp.id, c.id, !active)}
+                      onClick={() => toggleEmployeeService(emp.id, s.id, !active)}
                     >
                       {active ? '✓ ' : ''}
-                      {c.name}
+                      {s.name}
                     </button>
                   )
                 })}
-                {categories.length === 0 && <span className={styles.empty}>Önce bir alan ekleyin.</span>}
+                {services.length === 0 && <span className={styles.empty}>Önce bir hizmet ekleyin.</span>}
               </div>
 
               <div className={styles.addScheduleForm}>

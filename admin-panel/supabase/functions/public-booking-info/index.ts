@@ -58,14 +58,11 @@ Deno.serve(async (req) => {
     .eq('business_id', business.id)
     .eq('is_active', true)
 
-  let eligibleIds = (activeProfiles ?? []).map((p) => p.id)
+  // Bir hizmete hic kimse atanmamissa (bkz. Ekip sayfasi "Verebildigi
+  // Hizmetler") o hizmete kimse randevu alamaz — kasitli, fallback yok.
   const { data: empSvcs } = await admin.from('employee_services').select('profile_id').eq('service_id', service.id)
-  if (empSvcs && empSvcs.length > 0) {
-    // Bu hizmete hic kimse atanmamissa herkes uygun sayilir (bkz.
-    // EmployeeDetailPage.tsx "Verdigi Hizmetler").
-    const assignedIds = new Set(empSvcs.map((e) => e.profile_id))
-    eligibleIds = eligibleIds.filter((id) => assignedIds.has(id))
-  }
+  const assignedIds = new Set((empSvcs ?? []).map((e) => e.profile_id))
+  const eligibleIds = (activeProfiles ?? []).map((p) => p.id).filter((id) => assignedIds.has(id))
 
   if (!date) {
     // Sadece hizmet seçildi, tarih henüz seçilmedi — uzman listesini döndür.

@@ -163,15 +163,10 @@ Deno.serve(async (req) => {
     'business_id',
     business.id,
   )
-  let eligibleIds: string[]
+  // Bir hizmete hic kimse atanmamissa (bkz. Ekip sayfasi "Verebildigi
+  // Hizmetler") o hizmete kimse randevu alamaz — kasitli, fallback yok.
   const { data: empSvcs } = await admin.from('employee_services').select('profile_id').eq('service_id', service.id)
-  if (empSvcs && empSvcs.length > 0) {
-    eligibleIds = empSvcs.map((e) => e.profile_id)
-  } else {
-    // Bu hizmete hic kimse atanmamissa herkes uygun sayilir (bkz.
-    // EmployeeDetailPage.tsx "Verdigi Hizmetler").
-    eligibleIds = (allProfiles ?? []).map((p) => p.id)
-  }
+  let eligibleIds: string[] = (empSvcs ?? []).map((e) => e.profile_id)
 
   if (employee_id) {
     if (!eligibleIds.includes(employee_id)) {

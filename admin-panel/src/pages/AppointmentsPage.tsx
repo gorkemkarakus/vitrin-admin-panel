@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { TIME_OPTIONS } from '../lib/timeOptions'
 import Avatar from '../components/Avatar'
+import StatusDropdown, { type StatusDropdownOption } from '../components/StatusDropdown'
+import Select from '../components/Select'
 import type { LayoutOutletContext } from '../layouts/DashboardLayout'
 import styles from './AppointmentsPage.module.css'
 
@@ -18,7 +20,6 @@ interface Service {
   name: string
   duration_minutes: number
   price: number | null
-  category_id: string | null
 }
 
 interface Profile {
@@ -26,9 +27,9 @@ interface Profile {
   full_name: string | null
 }
 
-interface EmployeeCategory {
+interface EmployeeServiceRow {
   profile_id: string
-  category_id: string
+  service_id: string
 }
 
 interface Schedule {
@@ -81,6 +82,13 @@ const STATUS_CLASS: Record<Appointment['status'], string> = {
   iptal: styles.statusIptal,
 }
 
+const STATUS_DROPDOWN_OPTIONS: StatusDropdownOption[] = [
+  { value: 'bekliyor', label: 'Bekliyor', color: 'var(--warn-text)', bg: 'var(--warn-bg)' },
+  { value: 'onaylandi', label: 'Onaylandı', color: 'var(--info-text)', bg: 'var(--info-bg)' },
+  { value: 'tamamlandi', label: 'Tamamlandı', color: 'var(--ok-text)', bg: 'var(--ok-bg)' },
+  { value: 'iptal', label: 'İptal', color: 'var(--danger-text)', bg: 'var(--danger-bg)' },
+]
+
 const SLOT_MINUTES = 30
 const WEEKDAY_SHORT = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
 
@@ -109,7 +117,7 @@ export default function AppointmentsPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
-  const [employeeCategories, setEmployeeCategories] = useState<EmployeeCategory[]>([])
+  const [employeeServices, setEmployeeServices] = useState<EmployeeServiceRow[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [loading, setLoading] = useState(true)
@@ -125,11 +133,20 @@ export default function AppointmentsPage() {
   }, [])
 
   useEffect(() => {
+    let changed = false
     if (searchParams.get('yeni') === '1') {
       setShowForm(true)
       searchParams.delete('yeni')
-      setSearchParams(searchParams, { replace: true })
+      changed = true
     }
+    const tarih = searchParams.get('tarih')
+    if (tarih) {
+      setViewDate(tarih)
+      setViewMode('gunluk')
+      searchParams.delete('tarih')
+      changed = true
+    }
+    if (changed) setSearchParams(searchParams, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -147,14 +164,17 @@ export default function AppointmentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  async function loadData() {
-    setLoading(true)
+  // "silent=true" bir mutasyondan sonra cagrilir — veriyi arka planda
+  // tazeler ama "loading" bayragini geri true yapmaz, boylece sayfa her
+  // islemden sonra bos "Yükleniyor…" yazisina donup yeniden cizilmiyor.
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true)
     const [
       { data: appts },
       { data: custs },
       { data: svcs },
       { data: profs },
-      { data: empCats },
+      { data: empSvcs },
       { data: scheds },
       { data: blocks },
     ] = await Promise.all([
@@ -167,11 +187,11 @@ export default function AppointmentsPage() {
       supabase.from('customers').select('id, full_name, phone').order('full_name'),
       supabase
         .from('services')
-        .select('id, name, duration_minutes, price, category_id')
+        .select('id, name, duration_minutes, price')
         .eq('is_active', true)
         .order('name'),
       supabase.from('profiles').select('id, full_name'),
-      supabase.from('employee_categories').select('profile_id, category_id'),
+      supabase.from('employee_services').select('profile_id, service_id'),
       supabase.from('employee_schedules').select('profile_id, day_of_week, starts_at, ends_at'),
       supabase.from('employee_time_blocks').select('profile_id, day_of_week, block_date, starts_at, ends_at'),
     ])
@@ -179,7 +199,7 @@ export default function AppointmentsPage() {
     setCustomers(custs ?? [])
     setServices(svcs ?? [])
     setProfiles(profs ?? [])
-    setEmployeeCategories(empCats ?? [])
+    setEmployeeServices(empSvcs ?? [])
     setSchedules(scheds ?? [])
     setTimeBlocks(blocks ?? [])
     setLoading(false)
@@ -200,13 +220,15 @@ export default function AppointmentsPage() {
 
   const selectedService = services.find((s) => s.id === serviceId) ?? null
 
+  // Bir hizmete hic kimse atanmamissa (bkz. Ekip sayfasi "Verebildigi
+  // Hizmetler") o hizmete kimse randevu alamaz — kasitli, fallback yok.
   const eligibleEmployees = useMemo(() => {
-    if (!selectedService?.category_id) return profiles
+    if (!selectedService) return profiles
     const ids = new Set(
-      employeeCategories.filter((ec) => ec.category_id === selectedService.category_id).map((ec) => ec.profile_id),
+      employeeServices.filter((es) => es.service_id === selectedService.id).map((es) => es.profile_id),
     )
     return profiles.filter((p) => ids.has(p.id))
-  }, [selectedService, employeeCategories, profiles])
+  }, [selectedService, employeeServices, profiles])
 
   function isEmployeeAvailable(employeeId: string, start: Date, durationMinutes: number) {
     const dayOfWeek = start.getDay()
@@ -271,6 +293,10 @@ export default function AppointmentsPage() {
         return
       }
     } else {
+      if (eligibleEmployees.length === 0) {
+        setError('Bu hizmete atanmış çalışan yok. Önce Ekip sayfasından bir çalışana bu hizmeti atayın.')
+        return
+      }
       const candidates = eligibleEmployees.filter((p) => isEmployeeAvailable(p.id, start, duration))
       if (candidates.length === 0) {
         setError('Bu saatte bu hizmet için uygun çalışan yok. Başka bir saat deneyin.')
@@ -332,7 +358,7 @@ export default function AppointmentsPage() {
       setEmployeeId('')
       setApptTime('')
       setSourceNote('')
-      await loadData()
+      await loadData(true)
       setShowForm(false)
     } finally {
       setSubmitting(false)
@@ -341,7 +367,7 @@ export default function AppointmentsPage() {
 
   async function updateStatus(appt: Appointment, status: Appointment['status']) {
     await supabase.from('appointments').update({ status }).eq('id', appt.id)
-    await loadData()
+    await loadData(true)
   }
 
   function shiftDate(days: number) {
@@ -440,8 +466,17 @@ export default function AppointmentsPage() {
   function renderRow(a: Appointment) {
     const d = new Date(a.scheduled_at)
     const isPast = new Date(d.getTime() + (a.duration_minutes ?? SLOT_MINUTES) * 60000) < now
+    // "bekliyor" durumunda kalıp saati geçmiş randevular unutulmuş olabilir —
+    // bunları soluklaştırmak (diğer geçmiş randevularda yaptığımız gibi) tam
+    // tersi etki yaratır, gözden daha da kaçarlar. Bu yüzden ayrı, dikkat
+    // çeken bir durum olarak işaretliyoruz; zaten sonuçlanmış (onaylandı/
+    // tamamlandı/iptal) geçmiş randevular soluklaşmaya devam eder.
+    const isOverdue = isPast && a.status === 'bekliyor'
+    const rowClass = [styles.apptRow, isOverdue ? styles.apptRowOverdue : isPast ? styles.apptRowPast : '']
+      .filter(Boolean)
+      .join(' ')
     return (
-      <div className={`${styles.apptRow} ${isPast ? styles.apptRowPast : ''}`} key={a.id}>
+      <div className={rowClass} key={a.id}>
         <div className={styles.apptTime}>
           {d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
         </div>
@@ -458,24 +493,20 @@ export default function AppointmentsPage() {
           <span className={styles.serviceTag}>{serviceName(a.service_id)}</span>
         </div>
         <div className={styles.apptEmployee}>{employeeName(a.employee_id)}</div>
-        <div>
+        <div className={styles.statusCell}>
           {canEdit(a) ? (
-            <select
-              className={styles.statusSelect}
+            <StatusDropdown
               value={a.status}
-              onChange={(e) => updateStatus(a, e.target.value as Appointment['status'])}
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              options={STATUS_DROPDOWN_OPTIONS}
+              urgent={isOverdue}
+              onChange={(v) => updateStatus(a, v as Appointment['status'])}
+            />
           ) : (
             <span className={`${styles.statusBadge} ${STATUS_CLASS[a.status]}`}>
               {STATUS_OPTIONS.find((o) => o.value === a.status)?.label ?? a.status}
             </span>
           )}
+          {isOverdue && <span className={styles.overdueHint}>Süresi geçti, güncelle</span>}
         </div>
       </div>
     )
@@ -538,14 +569,12 @@ export default function AppointmentsPage() {
               {!useNewCustomer ? (
                 <div className="field">
                   <label htmlFor="customer">Müşteri</label>
-                  <select id="customer" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                    <option value="">Seçin…</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.full_name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    id="customer"
+                    value={customerId}
+                    onChange={setCustomerId}
+                    options={customers.map((c) => ({ value: c.id, label: c.full_name, sub: c.phone ?? undefined }))}
+                  />
                   <button type="button" className={styles.newCustomerToggle} onClick={() => setUseNewCustomer(true)}>
                     + Yeni müşteri ekle
                   </button>
@@ -573,33 +602,28 @@ export default function AppointmentsPage() {
 
               <div className="field">
                 <label htmlFor="service">Hizmet</label>
-                <select
+                <Select
                   id="service"
                   value={serviceId}
-                  onChange={(e) => {
-                    setServiceId(e.target.value)
+                  onChange={(v) => {
+                    setServiceId(v)
                     setEmployeeId('')
                   }}
-                >
-                  <option value="">Seçin…</option>
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.duration_minutes} dk)
-                    </option>
-                  ))}
-                </select>
+                  options={services.map((s) => ({ value: s.id, label: s.name, sub: `${s.duration_minutes} dk` }))}
+                />
               </div>
 
               <div className="field">
                 <label htmlFor="employee">Çalışan</label>
-                <select id="employee" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-                  <option value="">Farketmez</option>
-                  {eligibleEmployees.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  id="employee"
+                  value={employeeId}
+                  onChange={setEmployeeId}
+                  options={[
+                    { value: '', label: 'Farketmez' },
+                    ...eligibleEmployees.map((p) => ({ value: p.id, label: p.full_name ?? '—' })),
+                  ]}
+                />
               </div>
 
               <div className="field">
@@ -609,25 +633,17 @@ export default function AppointmentsPage() {
 
               <div className="field">
                 <label htmlFor="apptTime">Saat</label>
-                <select id="apptTime" value={apptTime} onChange={(e) => setApptTime(e.target.value)}>
-                  <option value="">Seçin…</option>
-                  {TIME_OPTIONS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  id="apptTime"
+                  value={apptTime}
+                  onChange={setApptTime}
+                  options={TIME_OPTIONS.map((t) => ({ value: t, label: t }))}
+                />
               </div>
 
               <div className="field">
                 <label htmlFor="source">Kaynak</label>
-                <select id="source" value={source} onChange={(e) => setSource(e.target.value)}>
-                  {SOURCE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                <Select id="source" value={source} onChange={setSource} options={SOURCE_OPTIONS} />
               </div>
 
               <div className="field">
