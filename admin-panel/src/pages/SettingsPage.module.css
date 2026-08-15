@@ -1,0 +1,56 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.cardTitle {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.cardHint {
+  margin: 0 0 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.select,
+.input {
+  flex: 1;
+  min-width: 180px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.select:focus,
+.input:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+
+.msgOk {
+  margin: 10px 0 0;
+  color: var(--ok-text);
+  font-size: 13px;
+}
+
+.msgErr {
+  margin: 10px 0 0;
+  color: var(--danger-text);
+  font-size: 13px;
+}

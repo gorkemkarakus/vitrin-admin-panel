@@ -142,6 +142,7 @@
       <div class="sub">Gerçek WhatsApp'a henüz bağlı değil — bu sayfa doğrudan staff-whatsapp-webhook fonksiyonunu çağırır.</div>
     </div>
     <div id="phoneRow">
+      <input id="apiKeyInput" type="text" placeholder="x-api-key (Supabase businesses.api_key_hash'e karşılık gelen düz metin anahtar)" style="width:280px">
       <input id="phoneInput" type="text" placeholder="ör. 05551234567">
       <button id="resetBtn">Konuşmayı temizle</button>
     </div>
@@ -155,15 +156,24 @@
 <script>
 const FUNCTION_URL = 'https://rllvmyriopaulcmmynbe.supabase.co/functions/v1/staff-whatsapp-webhook';
 const ANON_KEY = 'sb_publishable_CqpxvhHpayp_4Ad45ZZYHw_ti3Vo9ak';
+// x-api-key sir olarak repoya YAZILMAZ — kullanicidan alinip sadece
+// tarayicinin kendi localStorage'inda tutulur (n8n'deki "Vitrin Business API
+// Key" credential'iyla ayni degeri, elle bir kez girmen yeterli).
 
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 const phoneInput = document.getElementById('phoneInput');
+const apiKeyInput = document.getElementById('apiKeyInput');
 
 phoneInput.value = localStorage.getItem('vitrin_staff_test_phone') || '';
 phoneInput.addEventListener('change', () => {
   localStorage.setItem('vitrin_staff_test_phone', phoneInput.value.trim());
+});
+
+apiKeyInput.value = localStorage.getItem('vitrin_staff_test_apikey') || '';
+apiKeyInput.addEventListener('change', () => {
+  localStorage.setItem('vitrin_staff_test_apikey', apiKeyInput.value.trim());
 });
 
 function addMessage(type, text) {
@@ -178,12 +188,18 @@ function addMessage(type, text) {
 async function sendMessage() {
   const text = inputEl.value.trim();
   const phone = phoneInput.value.trim();
+  const apiKey = apiKeyInput.value.trim();
   if (!text) return;
+  if (!apiKey) {
+    addMessage('error', 'Önce yukarıya x-api-key değerini yazın (n8n\'deki "Vitrin Business API Key" credential\'ıyla aynı değer).');
+    return;
+  }
   if (!phone) {
     addMessage('error', 'Önce yukarıya, profilinize kayıtlı telefon numarasını yazın.');
     return;
   }
   localStorage.setItem('vitrin_staff_test_phone', phone);
+  localStorage.setItem('vitrin_staff_test_apikey', apiKey);
 
   addMessage('user', text);
   inputEl.value = '';
@@ -199,6 +215,7 @@ async function sendMessage() {
         'Content-Type': 'application/json',
         'apikey': ANON_KEY,
         'Authorization': 'Bearer ' + ANON_KEY,
+        'x-api-key': apiKey,
       },
       body: JSON.stringify({ phone, message: text }),
     });
@@ -230,7 +247,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   addMessage('system', 'Konuşma temizlendi (sunucudaki bekleyen taslak silinmedi — "iptal" yazarak temizleyebilirsin).');
 });
 
-addMessage('system', 'Yukarıya profilinize kayıtlı WhatsApp numarasını yazıp mesaj göndermeye başlayabilirsiniz.');
+addMessage('system', 'Yukarıya x-api-key ve profilinize kayıtlı WhatsApp numaranızı yazıp mesaj göndermeye başlayabilirsiniz.');
 inputEl.focus();
 </script>
 </body>

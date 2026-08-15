@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendCustomerMessage } from '../_shared/notify.ts'
+import { timingSafeEqualString } from '../_shared/crypto.ts'
 
 // Randevu HANGI yoldan olusursa olsun (chatbot, herkese acik randevu sayfasi,
 // operator paneli, isletmenin kendi paneli, WhatsApp'tan personel) tek bir
@@ -14,7 +15,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   const webhookSecret = Deno.env.get('APPOINTMENT_WEBHOOK_SECRET')
-  if (!webhookSecret || req.headers.get('x-webhook-secret') !== webhookSecret) {
+  const provided = req.headers.get('x-webhook-secret')
+  if (!webhookSecret || !provided || !timingSafeEqualString(provided, webhookSecret)) {
     return json({ error: 'Yetkisiz' }, 401)
   }
 

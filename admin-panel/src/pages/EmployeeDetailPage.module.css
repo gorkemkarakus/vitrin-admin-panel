@@ -1,0 +1,653 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+/* ---------- Ust satir: geri + avatar + isim ---------- */
+
+.topRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backBtn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backIcon {
+  transform: rotate(180deg);
+}
+
+.topInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.topName {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topSpecialty {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Kisisel bilgiler ---------- */
+
+.profileField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.profileField label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profileField input {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--text);
+  outline: none;
+}
+
+.profileField input:focus {
+  border-color: var(--signal);
+}
+
+.profileError {
+  color: var(--danger-text);
+  font-size: 12.5px;
+  margin: -4px 0 14px;
+}
+
+.profileSaveBtn {
+  width: auto;
+  padding: 10px 22px;
+  font-size: 13.5px;
+}
+
+.accountSection {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.accountTitle {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.accountHint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+
+.accountSuccess {
+  color: var(--ok-text);
+  font-size: 12.5px;
+  margin: -4px 0 14px;
+}
+
+/* ---------- Sekme cubugu ---------- */
+
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabBar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab,
+.tabActive {
+  flex-shrink: 0;
+  width: auto;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabActive {
+  background: var(--signal);
+  color: #fff;
+  cursor: default;
+}
+
+/* ---------- Istatistik kartlari ---------- */
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 12px 10px;
+  min-width: 0;
+}
+
+.statCardHead {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.statCardValue {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.statCardSub {
+  font-size: 9.5px;
+  color: var(--text-dim);
+  line-height: 1.35;
+}
+
+.statCardMiniRow {
+  display: flex;
+  gap: 8px;
+}
+
+.statCardMiniItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.statCardMiniValue {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.statCardMiniLabel {
+  font-size: 8.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.statusPill {
+  align-self: flex-start;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.statusPill_aktif {
+  color: var(--ok-text);
+  background: var(--ok-bg);
+}
+
+.statusPill_izinli {
+  color: var(--warn-text);
+  background: var(--warn-bg);
+}
+
+.statusPill_pasif {
+  color: var(--text-dim);
+  background: var(--panel-2);
+}
+
+/* ---------- Kart baslik + Duzenle linki ---------- */
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sectionHead h2 {
+  margin-bottom: 0;
+}
+
+.editLink {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  background: none;
+  border: none;
+  color: var(--signal);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  padding: 0;
+  cursor: pointer;
+}
+
+.editLink:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Gun pill secici ---------- */
+
+.dayPillRow {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  scrollbar-width: none;
+}
+
+.dayPillRow::-webkit-scrollbar {
+  display: none;
+}
+
+.dayPill,
+.dayPillActive {
+  flex-shrink: 0;
+  width: 42px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.dayPill {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+
+.dayPill:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.dayPillActive {
+  background: var(--signal);
+  border: 1px solid var(--signal);
+  color: #fff;
+}
+
+/* ---------- Secili gunun saat araliklari ---------- */
+
+.rangeList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.rangeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+}
+
+.rangeRow:hover {
+  border-color: var(--text-dim);
+}
+
+.rangeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rangeDotWork {
+  background: var(--ok-text);
+}
+
+.rangeDotBreak {
+  background: var(--warn-text);
+}
+
+.rangeText {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.rangeTextCol {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rangeSub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.rangeRow > .rangeText {
+  flex: 1;
+}
+
+.rangeBadge {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.rangeBadgeWork {
+  color: var(--ok-text);
+  background: var(--ok-bg);
+}
+
+.rangeBadgeBreak {
+  color: var(--warn-text);
+  background: var(--warn-bg);
+}
+
+.rangeChevron {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.emptyDay {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* ---------- Cerceveli "ekle" butonu ---------- */
+
+.outlineAddBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--signal);
+  color: var(--signal);
+  border-radius: 999px;
+  padding: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+
+.outlineAddBtn:hover {
+  background: #eaf1fb;
+}
+
+.infoBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #eaf1fb;
+  border: 1px solid #d3e3f8;
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--signal);
+}
+
+.infoBanner svg {
+  flex-shrink: 0;
+}
+
+/* ---------- Izin filtre segmenti ---------- */
+
+.leaveFilterToggle {
+  display: flex;
+  gap: 6px;
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 14px;
+}
+
+.leaveFilterTab,
+.leaveFilterTabActive {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 9px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--text-dim);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaveFilterTabActive {
+  background: var(--signal);
+  color: #fff;
+}
+
+/* ---------- Izin ozet listesi ---------- */
+
+.leaveSummaryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.leaveSummaryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+}
+
+.leaveSummaryRow:hover {
+  border-color: var(--text-dim);
+}
+
+.leaveSummaryIcon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #ede9fe;
+  color: #5b21b6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leaveSummaryText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.leaveSummaryDate {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaveSummarySub {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.leaveSummaryBadge {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #5b21b6;
+  background: #ede9fe;
+  white-space: nowrap;
+}
+
+.leaveSummaryMore {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+/* ---------- Alanlar ---------- */
+
+.employeeTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hashtag {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.categoryCheckboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.categoryChip,
+.categoryChipActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.1s;
+}
+
+.categoryChip {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+
+.categoryChip:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+  background: var(--panel);
+}
+
+.categoryChipActive {
+  background: var(--signal);
+  border: 1px solid var(--signal);
+  color: var(--signal-text);
+}
+
+.categoryChipActive:active,
+.categoryChip:active {
+  transform: scale(0.96);
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 13px;
+}

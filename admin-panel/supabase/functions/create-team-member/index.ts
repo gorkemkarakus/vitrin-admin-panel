@@ -1,5 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
+import { requireAdmin } from '../_shared/requireAdmin.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -9,46 +9,27 @@ Deno.serve(async (req) => {
     return json({ error: 'Method not allowed' }, 405)
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) return json({ error: 'Yetkilendirme başlığı eksik' }, 401)
+  const auth = await requireAdmin(req)
+  if (!auth.ok) return auth.response
+  const { businessId, admin } = auth
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-  // Çağıranın kimliğini kendi JWT'siyle doğrula (RLS'e tabi, düşük yetkili client)
-  const callerClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: userData, error: userErr } = await callerClient.auth.getUser()
-  if (userErr || !userData.user) return json({ error: 'Geçersiz oturum' }, 401)
-
-  // Buradan sonrası service_role ile — RLS'i bilerek atlıyoruz (admin işlemi)
-  const admin = createClient(supabaseUrl, serviceKey)
-
-  const { data: callerProfile, error: profileErr } = await admin
-    .from('profiles')
-    .select('business_id, role, is_active')
-    .eq('id', userData.user.id)
-    .maybeSingle()
-
-  if (profileErr || !callerProfile || !callerProfile.is_active || callerProfile.role !== 'admin') {
-    return json({ error: 'Bu işlemi sadece işletme yöneticisi yapabilir' }, 403)
-  }
-
-  let body: { email?: string; password?: string; full_name?: string; gender?: string }
+  let body: { email?: string; password?: string; full_name?: string; gender?: string; phone?: string }
   try {
     body = await req.json()
   } catch {
     return json({ error: 'Geçersiz istek gövdesi' }, 400)
   }
 
-  const { email, password, full_name, gender } = body
-  if (!email || !password || !full_name) {
-    return json({ error: 'email, password ve full_name zorunlu' }, 400)
+  const { email, password, full_name, gender, phone } = body
+  if (!email || !password || !full_name || !phone) {
+    return json({ error: 'email, password, full_name ve phone zorunlu' }, 400)
   }
   if (password.length < 6) {
     return json({ error: 'Şifre en az 6 karakter olmalı' }, 400)
+  }
+  const phoneDigits = phone.replace(/\D/g, '')
+  if (phoneDigits.length < 10) {
+    return json({ error: 'Geçerli bir telefon numarası girin' }, 400)
   }
   // gender opsiyonel — calisan bunu belirtmek istemeyebilir (ör. kurulumu
   // yoneticinin yaptigi durumlarda), boyle bir durumda NULL kalir ve chatbot
@@ -60,7 +41,7 @@ Deno.serve(async (req) => {
   const { data: business, error: bizErr } = await admin
     .from('businesses')
     .select('max_users')
-    .eq('id', callerProfile.business_id)
+    .eq('id', businessId)
     .maybeSingle()
 
   if (bizErr || !business) return json({ error: 'İşletme bulunamadı' }, 404)
@@ -68,7 +49,7 @@ Deno.serve(async (req) => {
   const { count, error: countErr } = await admin
     .from('profiles')
     .select('id', { count: 'exact', head: true })
-    .eq('business_id', callerProfile.business_id)
+    .eq('business_id', businessId)
     .eq('role', 'user')
     .eq('is_active', true)
 
@@ -100,19 +81,24 @@ Deno.serve(async (req) => {
 
   const { error: insertErr } = await admin.from('profiles').insert({
     id: created.user.id,
-    business_id: callerProfile.business_id,
+    business_id: businessId,
     role: 'user',
     full_name,
     is_active: true,
     gender: gender ?? null,
+    whatsapp_phone: phoneDigits,
   })
 
   if (insertErr) {
     // Profil eklenemediyse yetim auth kullanıcısı kalmasın
     console.error('create-team-member profile insert error:', insertErr.message)
     await admin.auth.admin.deleteUser(created.user.id)
-    return json({ error: 'Profil oluşturulamadı' }, 500)
+    const isDupPhone = insertErr.code === '23505' && insertErr.message.includes('whatsapp_phone')
+    return json({ error: isDupPhone ? 'Bu telefon numarası başka bir çalışana kayıtlı' : 'Profil oluşturulamadı' }, 500)
   }
 
-  return json({ data: { id: created.user.id, email, full_name, role: 'user', gender: gender ?? null } }, 200)
+  return json(
+    { data: { id: created.user.id, email, full_name, role: 'user', gender: gender ?? null, phone: phoneDigits } },
+    200,
+  )
 })

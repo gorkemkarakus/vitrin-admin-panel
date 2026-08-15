@@ -1,0 +1,46 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 480px;
+}
+
+.errorText {
+  font-size: 13.5px;
+  color: var(--danger-text);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.pickTitle {
+  font-family: var(--font-heading);
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.accountList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accountRow {
+  width: 100%;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.accountRow:hover {
+  border-color: var(--signal);
+}

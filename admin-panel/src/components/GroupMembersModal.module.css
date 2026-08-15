@@ -1,0 +1,259 @@
+.backdrop {
+  composes: backdrop from '../styles/modal.module.css';
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  max-height: 86vh;
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  padding: 24px 22px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.headText {
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 16.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.desc {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.headActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.iconBtnDanger:hover {
+  color: var(--danger-text);
+  border-color: var(--danger-text);
+}
+
+.editNameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.editNameActions {
+  display: flex;
+  gap: 8px;
+}
+
+.editNameActions button {
+  flex: 1;
+}
+
+.memberCount {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.addMemberBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed var(--line);
+  background: none;
+  border-radius: var(--radius-sm);
+  padding: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--signal);
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.addBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+}
+
+.searchIcon {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  padding: 9px 0;
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+
+.addList {
+  display: flex;
+  flex-direction: column;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--signal);
+}
+
+.addRow:hover {
+  background: var(--panel-2);
+}
+
+.addText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.addName {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addLastService {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doneAddBtn {
+  border: none;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  align-self: flex-end;
+  font-family: var(--font-body);
+}
+
+.errorText {
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.memberRow:last-child {
+  border-bottom: none;
+}
+
+.memberName {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberPhone {
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.removeBtn {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px;
+}
+
+.removeBtn:hover {
+  color: var(--danger-text);
+}
+
+.empty {
+  padding: 16px 4px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}

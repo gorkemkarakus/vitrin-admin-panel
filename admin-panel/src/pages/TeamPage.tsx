@@ -1,129 +1,120 @@
-import { useEffect, useState } from 'react'
-import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useMemo, useRef, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { TIME_OPTIONS } from '../lib/timeOptions'
-import type { LayoutOutletContext } from '../layouts/DashboardLayout'
-import Avatar, { colorForName } from '../components/Avatar'
-import { TrashIcon } from '../components/icons'
+import {
+  SearchIcon,
+  FilterIcon,
+  CheckCircleIcon,
+  PhoneIcon,
+  UmbrellaIcon,
+  ChevronRightIcon,
+  UserPlusIcon,
+} from '../components/icons'
+import Avatar from '../components/Avatar'
+import { toLocalDateString } from '../lib/date'
 import styles from './TeamPage.module.css'
-
-interface Service {
-  id: string
-  name: string
-  duration_minutes: number
-  price: number | null
-}
 
 interface Employee {
   id: string
   full_name: string | null
-}
-
-interface EmployeeServiceRow {
-  profile_id: string
-  service_id: string
-}
-
-interface Schedule {
-  id: string
-  profile_id: string
-  day_of_week: number
-  starts_at: string
-  ends_at: string
+  role: 'admin' | 'user'
+  is_active: boolean
+  whatsapp_phone: string | null
 }
 
 interface TimeBlock {
-  id: string
   profile_id: string
-  day_of_week: number | null
   block_date: string | null
-  starts_at: string
-  ends_at: string
-  label: string | null
+  end_date: string | null
 }
 
-const DAY_LABELS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
-const DAY_SHORT = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
-// Haftanin gorsel sirasi: Pazartesi'den basla, Pazar'la bitir (DAY_LABELS'daki
-// index'ler Postgres EXTRACT(DOW) kuralina gore: 0=Pazar).
-const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
-const WEEKDAYS = [1, 2, 3, 4, 5]
-const WEEKEND = [6, 0]
+interface Appointment {
+  id: string
+  employee_id: string | null
+  service_id: string | null
+  status: 'bekliyor' | 'onaylandi' | 'tamamlandi' | 'iptal' | 'gelmedi'
+  scheduled_at: string
+}
+
+interface Payment {
+  id: string
+  amount: number
+  appointment_id: string | null
+}
+
+type StatusFilter = 'tumu' | 'aktif' | 'izinli' | 'pasif'
+type SortBy = 'ad' | 'randevu' | 'kazanc'
+
+const STATUS_TABS: { value: StatusFilter; label: string }[] = [
+  { value: 'tumu', label: 'Tümü' },
+  { value: 'aktif', label: 'Aktif' },
+  { value: 'izinli', label: 'İzinli' },
+  { value: 'pasif', label: 'Pasif' },
+]
+
+const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: 'ad', label: 'Ada Göre (A-Z)' },
+  { value: 'randevu', label: 'Bugünkü Randevuya Göre' },
+  { value: 'kazanc', label: 'Bugünkü Kazanca Göre' },
+]
+
+function todayLocalDateString() {
+  return toLocalDateString(new Date())
+}
+
+function roleLabel(role: Employee['role']) {
+  return role === 'admin' ? 'Yönetici' : 'Çalışan'
+}
+
+// whatsapp_phone ham rakam dizisi olarak saklaniyor (ör. "905413402738")
+// — satirda okunakli olmasi icin standart TR cep telefonu bicimine ceviriyor.
+function formatPhone(raw: string) {
+  let digits = raw.replace(/\D/g, '')
+  if (digits.startsWith('90') && digits.length === 12) digits = digits.slice(2)
+  if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1)
+  if (digits.length !== 10) return raw
+  return `0${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`
+}
 
 export default function TeamPage() {
   const navigate = useNavigate()
-  const { searchQuery, setSearchPlaceholder } = useOutletContext<LayoutOutletContext>()
-  const [services, setServices] = useState<Service[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [employeeServices, setEmployeeServices] = useState<EmployeeServiceRow[]>([])
-  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [scheduleDraft, setScheduleDraft] = useState<
-    Record<string, { days: Set<number>; start: string; end: string }>
-  >({})
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('tumu')
+  const [sortBy, setSortBy] = useState<SortBy>('ad')
+  const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const sortMenuRef = useRef<HTMLDivElement>(null)
 
-  const [blockDraft, setBlockDraft] = useState<
-    Record<string, { mode: 'day' | 'date'; day: number; date: string; start: string; end: string; label: string }>
-  >({})
+  useEffect(() => {
+    if (!sortMenuOpen) return
+    function handleClick(e: MouseEvent) {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) setSortMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [sortMenuOpen])
 
-  function getBlockDraft(profileId: string) {
-    return (
-      blockDraft[profileId] ?? { mode: 'day' as const, day: 1, date: '', start: '', end: '', label: '' }
-    )
-  }
-
-  function setBlockDraftFor(
-    profileId: string,
-    next: { mode: 'day' | 'date'; day: number; date: string; start: string; end: string; label: string },
-  ) {
-    setBlockDraft((prev) => ({ ...prev, [profileId]: next }))
-  }
-
-  function getDraft(profileId: string) {
-    return scheduleDraft[profileId] ?? { days: new Set<number>(), start: '', end: '' }
-  }
-
-  function setDraft(profileId: string, next: { days: Set<number>; start: string; end: string }) {
-    setScheduleDraft((prev) => ({ ...prev, [profileId]: next }))
-  }
-
-  function toggleDraftDay(profileId: string, day: number) {
-    const draft = getDraft(profileId)
-    const days = new Set(draft.days)
-    if (days.has(day)) days.delete(day)
-    else days.add(day)
-    setDraft(profileId, { ...draft, days })
-  }
-
-  function applyDraftPreset(profileId: string, preset: number[]) {
-    const draft = getDraft(profileId)
-    setDraft(profileId, { ...draft, days: new Set(preset) })
-  }
-
-  // "silent=true" kucuk bir islemden (checkbox, saat ekleme/kaldirma) sonra
-  // cagrilir — veriyi arka planda tazeler ama "loading" bayragini geri true
-  // yapmaz, boylece tum sayfa her tikta bos "Yükleniyor…" yazisina donup
-  // yeniden cizilmiyor (kullanicidan gelen "sayfa yenileniyor gibi" geri
-  // bildirimi). Sadece ilk acilista gercek bir yukleme goruntusu gosterilir.
-  async function loadData(silent = false) {
-    if (!silent) setLoading(true)
-    const [{ data: svcs }, { data: profs }, { data: empSvcs }, { data: scheds }, { data: blocks }] =
-      await Promise.all([
-        supabase.from('services').select('id, name, duration_minutes, price').eq('is_active', true).order('name'),
-        supabase.from('profiles').select('id, full_name').order('full_name'),
-        supabase.from('employee_services').select('profile_id, service_id'),
-        supabase.from('employee_schedules').select('id, profile_id, day_of_week, starts_at, ends_at'),
-        supabase
-          .from('employee_time_blocks')
-          .select('id, profile_id, day_of_week, block_date, starts_at, ends_at, label'),
-      ])
-    setServices(svcs ?? [])
+  async function loadData() {
+    setLoading(true)
+    const [{ data: profs }, { data: blocks }, { data: appts }, { data: pays }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, full_name, role, is_active, whatsapp_phone')
+        .order('role', { ascending: false })
+        .order('full_name'),
+      supabase.from('employee_time_blocks').select('profile_id, block_date, end_date'),
+      supabase.from('appointments').select('id, employee_id, service_id, status, scheduled_at'),
+      supabase.from('payments').select('id, amount, appointment_id').is('voided_at', null).eq('paid_at', todayLocalDateString()),
+    ])
     setEmployees(profs ?? [])
-    setEmployeeServices(empSvcs ?? [])
-    setSchedules(scheds ?? [])
     setTimeBlocks(blocks ?? [])
+    setAppointments(appts ?? [])
+    setPayments(pays ?? [])
     setLoading(false)
   }
 
@@ -131,350 +122,185 @@ export default function TeamPage() {
     loadData()
   }, [])
 
-  useEffect(() => {
-    setSearchPlaceholder('Personel veya hizmet ara…')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const today = useMemo(() => todayLocalDateString(), [])
+  const appointmentById = useMemo(() => new Map(appointments.map((a) => [a.id, a])), [appointments])
 
-  async function toggleEmployeeService(profileId: string, serviceId: string, checked: boolean) {
-    if (checked) {
-      await supabase.from('employee_services').insert({ profile_id: profileId, service_id: serviceId })
-    } else {
-      await supabase.from('employee_services').delete().eq('profile_id', profileId).eq('service_id', serviceId)
+  const apptsByEmployeeToday = useMemo(() => {
+    const map = new Map<string, Appointment[]>()
+    for (const a of appointments) {
+      if (!a.employee_id) continue
+      if (toLocalDateString(new Date(a.scheduled_at)) !== today) continue
+      const list = map.get(a.employee_id) ?? []
+      list.push(a)
+      map.set(a.employee_id, list)
     }
-    await loadData(true)
+    return map
+  }, [appointments, today])
+
+  // Kazanc artik gercek odemelerden (payments, paid_at = bugun) hesaplaniyor —
+  // randevu tamamlandi diye ucretin tamami o an alinmis olmayabiliyor (paket/
+  // taksit/gecikmeli odeme). Randevu sayisi ise is yuku gostergesi oldugu icin
+  // hala randevu tablosundan (durum bazli) geliyor.
+  function todayStatsFor(profileId: string) {
+    const list = apptsByEmployeeToday.get(profileId) ?? []
+    const count = list.filter((a) => a.status !== 'iptal').length
+    const earnings = payments
+      .filter((p) => p.appointment_id && appointmentById.get(p.appointment_id)?.employee_id === profileId)
+      .reduce((sum, p) => sum + p.amount, 0)
+    return { count, earnings }
   }
 
-  async function addSchedules(profileId: string) {
-    const draft = getDraft(profileId)
-    if (draft.days.size === 0 || !draft.start || !draft.end) return
-
-    const existingForEmployee = schedules.filter((s) => s.profile_id === profileId)
-
-    await Promise.all(
-      Array.from(draft.days).map((day) => {
-        const existing = existingForEmployee.find((s) => s.day_of_week === day)
-        if (existing) {
-          return supabase
-            .from('employee_schedules')
-            .update({ starts_at: draft.start, ends_at: draft.end })
-            .eq('id', existing.id)
-        }
-        return supabase.from('employee_schedules').insert({
-          profile_id: profileId,
-          day_of_week: day,
-          starts_at: draft.start,
-          ends_at: draft.end,
-        })
-      }),
+  function statusFor(emp: Employee): 'aktif' | 'izinli' | 'pasif' {
+    if (!emp.is_active) return 'pasif'
+    const onLeaveToday = timeBlocks.some(
+      (b) => b.profile_id === emp.id && b.block_date !== null && b.block_date <= today && today <= (b.end_date ?? b.block_date),
     )
-    setDraft(profileId, { days: new Set(), start: '', end: '' })
-    await loadData(true)
+    return onLeaveToday ? 'izinli' : 'aktif'
   }
 
-  async function removeSchedule(id: string) {
-    await supabase.from('employee_schedules').delete().eq('id', id)
-    await loadData(true)
-  }
+  const counts = useMemo(() => {
+    const c = { tumu: employees.length, aktif: 0, izinli: 0, pasif: 0 }
+    for (const emp of employees) c[statusFor(emp)]++
+    return c
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employees, timeBlocks, today])
 
-  async function addBlock(profileId: string) {
-    const draft = getBlockDraft(profileId)
-    if (!draft.start || !draft.end) return
-    if (draft.mode === 'date' && !draft.date) return
-
-    await supabase.from('employee_time_blocks').insert({
-      profile_id: profileId,
-      day_of_week: draft.mode === 'day' ? draft.day : null,
-      block_date: draft.mode === 'date' ? draft.date : null,
-      starts_at: draft.start,
-      ends_at: draft.end,
-      label: draft.label.trim() || null,
+  const q = search.trim().toLowerCase()
+  const filteredSorted = useMemo(() => {
+    let list = employees.filter(
+      (e) => !q || (e.full_name ?? '').toLowerCase().includes(q) || (e.whatsapp_phone ?? '').toLowerCase().includes(q),
+    )
+    if (statusFilter !== 'tumu') list = list.filter((e) => statusFor(e) === statusFilter)
+    list = [...list].sort((a, b) => {
+      if (sortBy === 'ad') return (a.full_name ?? '').localeCompare(b.full_name ?? '', 'tr')
+      const sa = todayStatsFor(a.id)
+      const sb = todayStatsFor(b.id)
+      return sortBy === 'randevu' ? sb.count - sa.count : sb.earnings - sa.earnings
     })
-    setBlockDraftFor(profileId, { mode: 'day', day: 1, date: '', start: '', end: '', label: '' })
-    await loadData(true)
-  }
-
-  async function removeBlock(id: string) {
-    await supabase.from('employee_time_blocks').delete().eq('id', id)
-    await loadData(true)
-  }
+    return list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employees, q, statusFilter, sortBy, apptsByEmployeeToday])
 
   if (loading) return <p style={{ color: 'var(--text-dim)' }}>Yükleniyor…</p>
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.pageHead}>
-        <h1>Ekip Yönetimi</h1>
-        <p>Çalışanların hangi hizmetleri verebildiğini ve çalışma programlarını tek yerden yönetin.</p>
+      <div className={styles.searchRow}>
+        <div className={styles.searchBox}>
+          <SearchIcon width={16} height={16} className={styles.searchIcon} />
+          <input
+            className={styles.searchInput}
+            placeholder="Ekip üyesi ara…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <button type="button" className={styles.addBtn} onClick={() => navigate('/ekip/yeni')} aria-label="Yeni çalışan ekle">
+          <UserPlusIcon width={17} height={17} />
+        </button>
+        <div className={styles.filterWrap} ref={sortMenuRef}>
+          <button
+            type="button"
+            className={styles.filterBtn}
+            onClick={() => setSortMenuOpen((v) => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={sortMenuOpen}
+          >
+            <FilterIcon width={15} height={15} />
+            Filtrele
+          </button>
+          {sortMenuOpen && (
+            <div className={styles.filterMenu} role="listbox">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  type="button"
+                  key={opt.value}
+                  className={styles.filterMenuItem}
+                  onClick={() => {
+                    setSortBy(opt.value)
+                    setSortMenuOpen(false)
+                  }}
+                >
+                  {opt.label}
+                  {sortBy === opt.value && <CheckCircleIcon width={14} height={14} />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="card">
-        <div className={styles.cardHeadRow}>
-          <h2>Ekip Üyeleri</h2>
-          <button type="button" className="btn-secondary" style={{ width: 'auto' }} onClick={() => navigate('/kullanicilar')}>
-            + Yeni Personel
+      <div className={styles.segmentRow}>
+        {STATUS_TABS.map((tab) => (
+          <button
+            type="button"
+            key={tab.value}
+            className={statusFilter === tab.value ? styles.segmentBtnActive : styles.segmentBtn}
+            onClick={() => setStatusFilter(tab.value)}
+          >
+            {tab.label} ({counts[tab.value]})
           </button>
-        </div>
-        <div className={styles.employeeGrid}>
-        {(searchQuery.trim()
-          ? employees.filter((emp) => (emp.full_name ?? '').toLowerCase().includes(searchQuery.trim().toLowerCase()))
-          : employees
-        ).map((emp) => {
-          const empServiceIds = new Set(
-            employeeServices.filter((es) => es.profile_id === emp.id).map((es) => es.service_id),
-          )
-          const empSchedules = schedules.filter((s) => s.profile_id === emp.id)
-          const empBlocks = timeBlocks.filter((b) => b.profile_id === emp.id)
-          const draft = getDraft(emp.id)
-          const bDraft = getBlockDraft(emp.id)
+        ))}
+      </div>
 
-          return (
-            <div className={styles.employeeCard} key={emp.id}>
-              <div className={styles.employeeHead}>
-                <Avatar name={emp.full_name ?? '?'} size={44} />
-                <div>
-                  <div className={styles.employeeName}>{emp.full_name ?? '—'}</div>
-                  <div className={styles.employeeTags}>
-                    {services
-                      .filter((s) => empServiceIds.has(s.id))
-                      .map((s) => (
-                        <span key={s.id} className={styles.hashtag} style={{ color: colorForName(s.name) }}>
-                          #{s.name.replace(/\s+/g, '')}
-                        </span>
-                      ))}
-                    {empServiceIds.size === 0 && <span className={styles.hashtagEmpty}>Henüz hizmet atanmadı</span>}
-                  </div>
-                </div>
-              </div>
+      <button type="button" className={styles.holidayRow} onClick={() => navigate('/ekip/tatiller')}>
+        <span className={styles.holidayRowIcon}>
+          <UmbrellaIcon width={18} height={18} />
+        </span>
+        <span className={styles.holidayRowText}>
+          <span className={styles.holidayRowLabel}>Resmî Tatiller</span>
+          <span className={styles.holidayRowSub}>Tüm ekip için toplu izin günü tanımla</span>
+        </span>
+        <ChevronRightIcon width={16} height={16} className={styles.holidayRowChevron} />
+      </button>
 
-              <div className={styles.blockSectionTitle}>Verebildiği Hizmetler</div>
-              <div className={styles.categoryCheckboxes}>
-                {services.map((s) => {
-                  const active = empServiceIds.has(s.id)
-                  return (
-                    <button
-                      type="button"
-                      key={s.id}
-                      className={active ? styles.categoryChipActive : styles.categoryChip}
-                      onClick={() => toggleEmployeeService(emp.id, s.id, !active)}
-                    >
-                      {active ? '✓ ' : ''}
-                      {s.name}
-                    </button>
-                  )
-                })}
-                {services.length === 0 && <span className={styles.empty}>Önce bir hizmet ekleyin.</span>}
-              </div>
+      <div className="card">
+        <div className={styles.list}>
+          {filteredSorted.length === 0 ? (
+            <p style={{ color: 'var(--text-dim)' }}>Ekip üyesi bulunamadı.</p>
+          ) : (
+            filteredSorted.map((emp) => {
+              const status = statusFor(emp)
+              const stats = todayStatsFor(emp.id)
 
-              <div className={styles.addScheduleForm}>
-                <div className={styles.scheduleHeadRow}>
-                  <span className={styles.blockSectionTitle}>Haftalık Çalışma Saatleri</span>
-                  <div className={styles.presetRow}>
-                    <button type="button" className="btn-secondary" onClick={() => applyDraftPreset(emp.id, WEEKDAYS)}>
-                      Hafta İçi
-                    </button>
-                    <button type="button" className="btn-secondary" onClick={() => applyDraftPreset(emp.id, WEEKEND)}>
-                      Hafta Sonu
-                    </button>
-                  </div>
-                </div>
-
-                {empSchedules.length > 0 && (
-                  <div className={styles.existingSchedules}>
-                    {WEEK_ORDER.map((day) => {
-                      const s = empSchedules.find((s) => s.day_of_week === day)
-                      if (!s) return null
-                      return (
-                        <div className={styles.scheduleRow} key={s.id}>
-                          <span>
-                            <strong>{DAY_SHORT[s.day_of_week]}</strong> {s.starts_at.slice(0, 5)} – {s.ends_at.slice(0, 5)}
-                          </span>
-                          <button onClick={() => removeSchedule(s.id)}>Kaldır</button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-
-                <div className={styles.presetRow}>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => applyDraftPreset(emp.id, WEEK_ORDER)}
+              return (
+                <div key={emp.id} className={styles.rowWrap}>
+                  <div
+                    className={styles.row}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/ekip/${emp.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') navigate(`/ekip/${emp.id}`)
+                    }}
                   >
-                    Her Gün
-                  </button>
-                  <button type="button" className="btn-secondary" onClick={() => applyDraftPreset(emp.id, [])}>
-                    Temizle
-                  </button>
-                </div>
-
-                <div className={styles.dayChipRow}>
-                  {WEEK_ORDER.map((day) => (
-                    <button
-                      type="button"
-                      key={day}
-                      className={draft.days.has(day) ? styles.dayChipActive : styles.dayChip}
-                      onClick={() => toggleDraftDay(emp.id, day)}
-                    >
-                      {DAY_SHORT[day]}
-                    </button>
-                  ))}
-                </div>
-
-                <div className={styles.timeRow}>
-                  <div className={styles.timeField}>
-                    <label>Başlangıç</label>
-                    <select
-                      value={draft.start}
-                      onChange={(e) => setDraft(emp.id, { ...draft, start: e.target.value })}
-                    >
-                      <option value="">--:--</option>
-                      {TIME_OPTIONS.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <span className={styles.timeSep}>–</span>
-                  <div className={styles.timeField}>
-                    <label>Bitiş</label>
-                    <select
-                      value={draft.end}
-                      onChange={(e) => setDraft(emp.id, { ...draft, end: e.target.value })}
-                    >
-                      <option value="">--:--</option>
-                      {TIME_OPTIONS.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button type="button" className="btn-primary" onClick={() => addSchedules(emp.id)}>
-                    {draft.days.size > 1 ? `${draft.days.size} güne ekle` : 'Ekle'}
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.blockSection}>
-                <div className={styles.blockSectionTitle}>Bloke Saatler (Mola/Eğitim)</div>
-
-                {empBlocks.length > 0 && (
-                  <div className={styles.existingSchedules}>
-                    {empBlocks.map((b) => (
-                      <div className={styles.blockRow} key={b.id}>
-                        <span>
-                          <strong>
-                            {b.day_of_week !== null
-                              ? DAY_SHORT[b.day_of_week]
-                              : new Date(b.block_date + 'T00:00:00').toLocaleDateString('tr-TR', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                })}
-                          </strong>{' '}
-                          {b.starts_at.slice(0, 5)} – {b.ends_at.slice(0, 5)}
-                          {b.label ? ` (${b.label})` : ''}
+                    <div className={styles.avatarWrap}>
+                      <Avatar name={emp.full_name ?? '?'} size={38} />
+                      <span className={`${styles.statusDot} ${styles[`statusDot_${status}`]}`} />
+                    </div>
+                    <div className={styles.rowMain}>
+                      <span className={styles.rowName}>{emp.full_name ?? '—'}</span>
+                      <span className={styles.rowRole}>{roleLabel(emp.role)}</span>
+                      {emp.whatsapp_phone && (
+                        <span className={styles.rowPhone}>
+                          <PhoneIcon width={11} height={11} />
+                          <span className={styles.rowPhoneText}>{formatPhone(emp.whatsapp_phone)}</span>
                         </span>
-                        <button className={styles.blockRemove} onClick={() => removeBlock(b.id)} aria-label="Bloke saati kaldır">
-                          <TrashIcon width={13} height={13} />
-                        </button>
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                    <div className={styles.rowStatBlock}>
+                      <span className={styles.rowStatLabel}>Randevu</span>
+                      <span className={styles.rowStatValue}>{stats.count}</span>
+                    </div>
+                    <span className={`${styles.statusPill} ${styles[`statusPill_${status}`]}`}>
+                      {STATUS_TABS.find((t) => t.value === status)?.label}
+                    </span>
+                    <span className={styles.editLabel}>Düzenle</span>
                   </div>
-                )}
-
-                <div className={styles.blockForm}>
-                  <div className={styles.blockModeRow}>
-                    <button
-                      type="button"
-                      className={bDraft.mode === 'day' ? styles.dayChipActive : styles.dayChip}
-                      onClick={() => setBlockDraftFor(emp.id, { ...bDraft, mode: 'day' })}
-                    >
-                      Her hafta
-                    </button>
-                    <button
-                      type="button"
-                      className={bDraft.mode === 'date' ? styles.dayChipActive : styles.dayChip}
-                      onClick={() => setBlockDraftFor(emp.id, { ...bDraft, mode: 'date' })}
-                    >
-                      Tek tarih
-                    </button>
-                  </div>
-
-                  {bDraft.mode === 'day' ? (
-                    <div className={styles.timeField}>
-                      <label>Gün</label>
-                      <select
-                        value={bDraft.day}
-                        onChange={(e) => setBlockDraftFor(emp.id, { ...bDraft, day: Number(e.target.value) })}
-                      >
-                        {WEEK_ORDER.map((day) => (
-                          <option key={day} value={day}>
-                            {DAY_LABELS[day]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div className={styles.timeField}>
-                      <label>Tarih</label>
-                      <input
-                        type="date"
-                        value={bDraft.date}
-                        onChange={(e) => setBlockDraftFor(emp.id, { ...bDraft, date: e.target.value })}
-                      />
-                    </div>
-                  )}
-
-                  <div className={styles.timeRow}>
-                    <div className={styles.timeField}>
-                      <label>Başlangıç</label>
-                      <select
-                        value={bDraft.start}
-                        onChange={(e) => setBlockDraftFor(emp.id, { ...bDraft, start: e.target.value })}
-                      >
-                        <option value="">--:--</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <span className={styles.timeSep}>–</span>
-                    <div className={styles.timeField}>
-                      <label>Bitiş</label>
-                      <select
-                        value={bDraft.end}
-                        onChange={(e) => setBlockDraftFor(emp.id, { ...bDraft, end: e.target.value })}
-                      >
-                        <option value="">--:--</option>
-                        {TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <input
-                    className={styles.blockLabelInput}
-                    placeholder="Etiket (ör. Öğle Molası, Eğitim)"
-                    value={bDraft.label}
-                    onChange={(e) => setBlockDraftFor(emp.id, { ...bDraft, label: e.target.value })}
-                  />
-
-                  <button type="button" className={styles.dashedAddBtn} onClick={() => addBlock(emp.id)}>
-                    + Bloke Saat Ekle
-                  </button>
                 </div>
-              </div>
-            </div>
-          )
-        })}
+              )
+            })
+          )}
         </div>
       </div>
     </div>

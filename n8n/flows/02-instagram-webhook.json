@@ -120,17 +120,15 @@
             {
               "name": "Authorization",
               "value": "Bearer sb_publishable_CqpxvhHpayp_4Ad45ZZYHw_ti3Vo9ak"
-            },
-            {
-              "name": "x-api-key",
-              "value": "vt_dc83695efe9e86576fc521c3befa6be34879118f690b0bb9"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ customer_phone: $('Parse Instagram Message').item.json.customer_phone }) }}",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "ig7-get-context",
       "name": "Get Context IG",
@@ -140,7 +138,13 @@
         860,
         500
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
+          "name": "Vitrin Business API Key"
+        }
+      }
     },
     {
       "parameters": {
@@ -251,10 +255,6 @@
             {
               "name": "Authorization",
               "value": "Bearer sb_publishable_CqpxvhHpayp_4Ad45ZZYHw_ti3Vo9ak"
-            },
-            {
-              "name": "x-api-key",
-              "value": "vt_dc83695efe9e86576fc521c3befa6be34879118f690b0bb9"
             }
           ]
         },
@@ -267,7 +267,9 @@
               "neverError": true
             }
           }
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "ig13-call-book-appointment",
       "name": "Call book-appointment IG",
@@ -277,7 +279,13 @@
         2180,
         360
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
+          "name": "Vitrin Business API Key"
+        }
+      }
     },
     {
       "parameters": {
@@ -315,17 +323,15 @@
             {
               "name": "Authorization",
               "value": "Bearer sb_publishable_CqpxvhHpayp_4Ad45ZZYHw_ti3Vo9ak"
-            },
-            {
-              "name": "x-api-key",
-              "value": "vt_dc83695efe9e86576fc521c3befa6be34879118f690b0bb9"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ customer_phone: $json.customer_phone, messages: [ { role: 'user', content: $json.message }, { role: 'assistant', content: $json.reply } ] }) }}",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "ig16-log-messages",
       "name": "Log Messages IG",
@@ -335,7 +341,13 @@
         2620,
         500
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
+          "name": "Vitrin Business API Key"
+        }
+      }
     },
     {
       "parameters": {

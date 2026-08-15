@@ -1,0 +1,388 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------- Arama + filtrele satiri ---------- */
+
+.searchRow {
+  display: flex;
+  gap: 10px;
+}
+
+.searchBox {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+}
+
+.searchIcon {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  padding: 11px 0;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+
+.searchInput::placeholder {
+  color: var(--text-dim);
+}
+
+.filterWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.filterMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(31, 41, 55, 0.14);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  z-index: 20;
+}
+
+.filterMenuItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 10px;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  white-space: nowrap;
+}
+
+.filterMenuItem:hover {
+  background: var(--panel-2);
+}
+
+.filterMenuItem svg {
+  color: var(--signal);
+  flex-shrink: 0;
+}
+
+/* ---------- Ust kartlarin donem secici (Tum Zamanlar / Son Hafta / Son Ay) ---------- */
+
+.periodRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.periodBtn,
+.periodBtnActive {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 8px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--text-dim);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.periodBtnActive {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
+/* ---------- Segment sekmeleri ---------- */
+
+.segmentRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  row-gap: 6px;
+}
+
+.segmentBtn,
+.segmentBtnActive {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 9px 6px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--text-dim);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segmentBtnActive {
+  background: var(--signal);
+  color: #fff;
+}
+
+/* ---------- Musteri listesi ---------- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 2px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--panel-2);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.loadMoreBtn {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 13px 2px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--signal);
+  text-align: center;
+  cursor: pointer;
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rowName {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.rowPhone {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-top: 1px;
+}
+
+.badgeSadik {
+  color: var(--signal);
+  background: #eaf1fb;
+}
+
+.badgeYeni {
+  color: var(--ok-text);
+  background: var(--ok-bg);
+}
+
+.debtBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-top: 1px;
+  color: var(--danger-text);
+  background: var(--danger-bg);
+}
+
+.rowStats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.rowStatBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.rowStatLabel {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.rowStatValueSignal {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--signal);
+}
+
+.rowStatValue {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rowChevron {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* ---------- Ust istatistik kartlari ---------- */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+}
+
+.statCardSignal {
+  background: #eaf1fb;
+}
+
+.statCardOk {
+  background: #eafaf3;
+}
+
+.statCardWarn {
+  background: #fdf3e7;
+}
+
+.statCardInfo {
+  background: #eaf2fd;
+}
+
+.statIcon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.statIconSignal {
+  background: #dbe7f8;
+  color: var(--signal);
+}
+
+.statIconOk {
+  background: #d1f2e3;
+  color: var(--ok-text);
+}
+
+.statIconWarn {
+  background: #fae6c8;
+  color: var(--warn-text);
+}
+
+.statIconInfo {
+  background: #d3e6fb;
+  color: var(--info-text);
+}
+
+.statValue {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.statLabel {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  line-height: 1.25;
+}

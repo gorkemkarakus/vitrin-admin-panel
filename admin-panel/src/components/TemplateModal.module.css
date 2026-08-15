@@ -1,0 +1,104 @@
+.backdrop {
+  composes: backdrop from '../styles/modal.module.css';
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  padding: 24px 22px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.errorText {
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+/* ---------- AI ile oluştur ---------- */
+
+.aiBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--info-bg);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.aiLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--info-text);
+}
+
+.aiRow {
+  display: flex;
+  gap: 8px;
+}
+
+.aiInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--text);
+  outline: none;
+}
+
+.aiInput:focus {
+  border-color: var(--signal);
+}
+
+.aiBtn {
+  flex-shrink: 0;
+  background: var(--signal);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.aiBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.actions button {
+  flex: 1;
+}
+
+.deleteBtn {
+  flex: 0 0 auto;
+  color: var(--danger-text);
+  border-color: var(--danger-text);
+}

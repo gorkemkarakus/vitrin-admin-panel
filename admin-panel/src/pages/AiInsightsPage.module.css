@@ -1,0 +1,313 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1100px;
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.errorText {
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+.listItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.listIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.listIconInfo {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.listIconDanger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.listIconOk {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.riskCard {
+  border-left: 3px solid var(--danger-text);
+}
+
+.recCard {
+  border-left: 3px solid var(--ok-text);
+}
+
+/* ---------- Başlık + tarih aralığı ---------- */
+
+.pageHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.filterRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .filterRow {
+    width: 100%;
+  }
+}
+
+.filterBtn,
+.filterBtnActive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filterBtnActive {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
+/* ---------- Hero kart: sağlık skoru + AI özeti ---------- */
+
+.heroCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 28px 32px;
+  border-radius: var(--radius-lg, 16px);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  color: var(--text);
+  box-shadow: 0 8px 28px rgba(31, 41, 55, 0.08);
+}
+
+.heroText {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+  flex: 1;
+}
+
+.heroEyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.heroStatus {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.heroSummary {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  max-width: 56ch;
+}
+
+.heroBtn {
+  align-self: flex-start;
+  margin-top: 4px;
+  background: var(--signal);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.heroBtn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.heroError {
+  font-size: 12.5px;
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.heroGauge {
+  flex-shrink: 0;
+}
+
+/* ---------- KPI şeridi ---------- */
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 860px) {
+  .kpiRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.kpiTile {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  padding: 16px;
+}
+
+.kpiIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--info-bg);
+  color: var(--info-text);
+  margin-bottom: 2px;
+}
+
+.kpiValue {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.kpiDeltaUp,
+.kpiDeltaDown {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.kpiDeltaUp {
+  color: var(--ok-text);
+}
+
+.kpiDeltaDown {
+  color: var(--danger-text);
+}
+
+/* ---------- Grafik satırı ---------- */
+
+.chartsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .chartsRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Müşteri Segmentleri: donut ---------- */
+
+.donutRow {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.donutLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.legendRow strong {
+  color: var(--text);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}

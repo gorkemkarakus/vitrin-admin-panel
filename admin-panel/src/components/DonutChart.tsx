@@ -9,6 +9,8 @@ interface DonutChartProps {
   strokeWidth?: number
   centerLabel?: string
   centerSubLabel?: string
+  centerLabelColor?: string
+  centerSubLabelColor?: string
 }
 
 export default function DonutChart({
@@ -17,6 +19,8 @@ export default function DonutChart({
   strokeWidth = 20,
   centerLabel,
   centerSubLabel,
+  centerLabelColor = 'var(--text)',
+  centerSubLabelColor = 'var(--text-dim)',
 }: DonutChartProps) {
   const total = segments.reduce((s, seg) => s + seg.value, 0) || 1
   const radius = (size - strokeWidth) / 2
@@ -60,12 +64,12 @@ export default function DonutChart({
           }}
         >
           {centerLabel && (
-            <span style={{ fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 600, color: 'var(--text)' }}>
+            <span style={{ fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 600, color: centerLabelColor }}>
               {centerLabel}
             </span>
           )}
           {centerSubLabel && (
-            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{centerSubLabel}</span>
+            <span style={{ fontSize: 11, color: centerSubLabelColor }}>{centerSubLabel}</span>
           )}
         </div>
       )}

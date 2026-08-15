@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,31 +6,69 @@ import { supabase } from '../lib/supabase'
 import {
   DashboardIcon,
   AppointmentsIcon,
-  TeamIcon,
-  ServicesIcon,
-  AccountingIcon,
   UsersIcon,
-  MessagesIcon,
-  SearchIcon,
+  MoreHorizontalIcon,
   BellIcon,
   PlusIcon,
+  SettingsIcon,
+  LogOutIcon,
 } from '../components/icons'
 import styles from './DashboardLayout.module.css'
 
+// Mobildeki alt navigasyon barinin (Ana Sayfa/Takvim/Musteriler/Daha Fazla)
+// birebir karsiligi — geri kalan her sey (Muhasebe/Ekip/Hizmetler/Performans
+// Raporu/Ayarlar) mobildeki gibi "Daha Fazla" sayfasinin arkasinda.
 const NAV_ITEMS = [
-  { path: '/mesajlar', label: 'Mesajlar', adminOnly: false, icon: MessagesIcon },
+  { path: '/dashboard', label: 'Anasayfa', adminOnly: true, icon: DashboardIcon },
   { path: '/randevular', label: 'Randevular', adminOnly: false, icon: AppointmentsIcon },
-  { path: '/dashboard', label: 'Dashboard', adminOnly: true, icon: DashboardIcon },
-  { path: '/muhasebe', label: 'Muhasebe', adminOnly: true, icon: AccountingIcon },
-  { path: '/ekip', label: 'Ekip', adminOnly: true, icon: TeamIcon },
-  { path: '/hizmetler', label: 'Hizmetler', adminOnly: true, icon: ServicesIcon },
-  { path: '/kullanicilar', label: 'Kullanıcılar', adminOnly: true, icon: UsersIcon },
+  { path: '/musteriler', label: 'Müşteriler', adminOnly: false, icon: UsersIcon },
+  { path: '/daha-fazla', label: 'Daha Fazla', adminOnly: false, icon: MoreHorizontalIcon },
 ]
+
+// Sidebar'da olmayan (Daha Fazla sayfasindan veya bir listeden acilan)
+// sayfalarin ustbar basligini karsilar. Dinamik /ekip/:id gibi path'ler
+// icin asagida prefix eslesmesi kullanilir.
+const EXTRA_PAGE_TITLES: Record<string, string> = {
+  '/ayarlar': 'Ayarlar',
+  '/muhasebe': 'Muhasebe',
+  '/giderler': 'Giderler',
+  '/ekip': 'Ekip',
+  '/ekip/yeni': 'Yeni Çalışan',
+  '/ekip/tatiller': 'Resmî Tatiller',
+  '/hizmetler': 'Hizmetler',
+  '/performans-raporu': 'Performans Raporu',
+  '/mesajlar': 'Mesajlar',
+  '/ai-analiz': 'AI İş Analizi',
+}
+
+function pageTitleFor(pathname: string) {
+  const navMatch = NAV_ITEMS.find((item) => item.path === pathname)
+  if (navMatch) return navMatch.label
+  if (EXTRA_PAGE_TITLES[pathname]) return EXTRA_PAGE_TITLES[pathname]
+  if (pathname.startsWith('/ekip/') && pathname.endsWith('/saatler')) return 'Çalışma Saatleri'
+  if (pathname.startsWith('/ekip/') && pathname.endsWith('/izinler')) return 'İzinli Günler'
+  if (pathname.startsWith('/ekip/')) return 'Çalışan Detayı'
+  if (pathname.startsWith('/musteriler/')) return 'Müşteri Detayı'
+  if (pathname.startsWith('/hizmetler/')) return 'Hizmet Açıklaması'
+  return 'Panel'
+}
+
+function timeGreeting() {
+  const h = new Date().getHours()
+  if (h < 11) return 'Günaydın'
+  if (h < 18) return 'İyi günler'
+  return 'İyi akşamlar'
+}
 
 interface PendingAppointment {
   id: string
   scheduled_at: string
   customer_name: string
+}
+
+function apptDateKey(iso: string) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export interface LayoutOutletContext {
@@ -43,15 +81,42 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const { profile, signOut } = useAuth()
   const isAdmin = profile?.role === 'admin'
+  const isHome = location.pathname === '/dashboard'
+  const firstName = (profile?.full_name ?? 'İşletmeniz').trim().split(/\s+/)[0]
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchPlaceholder, setSearchPlaceholder] = useState('Ara…')
   const [pending, setPending] = useState<PendingAppointment[]>([])
   const [bellOpen, setBellOpen] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const bellRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setSearchQuery('')
+    setBellOpen(false)
+    setProfileMenuOpen(false)
   }, [location.pathname])
+
+  // Bildirim/profil kutusundan disari tiklaninca, sayfa kaydirilinca veya
+  // geri gidilince kapat.
+  useEffect(() => {
+    if (!bellOpen && !profileMenuOpen) return
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as Node
+      if (bellOpen && bellRef.current && !bellRef.current.contains(target)) setBellOpen(false)
+      if (profileMenuOpen && profileRef.current && !profileRef.current.contains(target)) setProfileMenuOpen(false)
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setBellOpen(false)
+        setProfileMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [bellOpen, profileMenuOpen])
 
   useEffect(() => {
     async function loadPending() {
@@ -78,7 +143,7 @@ export default function DashboardLayout() {
   }, [location.pathname])
 
   const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin)
-  const currentTitle = NAV_ITEMS.find((item) => item.path === location.pathname)?.label ?? 'Panel'
+  const currentTitle = pageTitleFor(location.pathname)
 
   return (
     <div className={styles.shell}>
@@ -111,18 +176,18 @@ export default function DashboardLayout() {
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <h1 className={styles.pageTitle}>{currentTitle}</h1>
-          <div className={styles.searchWrap}>
-            <SearchIcon className={styles.searchIcon} />
-            <input
-              className={styles.searchInput}
-              placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+          {isHome ? (
+            <div className={styles.greeting}>
+              <h1>
+                {timeGreeting()}, {firstName} 👋
+              </h1>
+              <p>Bugün işletmende neler oluyor?</p>
+            </div>
+          ) : (
+            <h1 className={styles.pageTitle}>{currentTitle}</h1>
+          )}
           <div className={styles.topbarRight}>
-            <div className={styles.bellWrap}>
+            <div className={styles.bellWrap} ref={bellRef}>
               <button
                 type="button"
                 className={styles.bellBtn}
@@ -145,7 +210,7 @@ export default function DashboardLayout() {
                         className={styles.bellItem}
                         onClick={() => {
                           setBellOpen(false)
-                          navigate('/randevular')
+                          navigate(`/randevular?tarih=${apptDateKey(a.scheduled_at)}`)
                         }}
                       >
                         <span>{a.customer_name}</span>
@@ -163,20 +228,55 @@ export default function DashboardLayout() {
                 </div>
               )}
             </div>
-            <div className={styles.profile}>
-              <span className={styles.avatar}>{(profile?.full_name ?? 'İ').charAt(0).toUpperCase()}</span>
-              <div className={styles.profileText}>
-                <span className={styles.profileName}>{profile?.full_name ?? 'İşletmeniz'}</span>
-                <span className={styles.profileRole}>{isAdmin ? 'Salon Sahibi' : 'Çalışan'}</span>
-              </div>
-              <button className={styles.signOut} onClick={() => signOut()}>
-                Çıkış yap
+            <div className={styles.profileWrap} ref={profileRef}>
+              <button
+                type="button"
+                className={styles.profile}
+                onClick={() => setProfileMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+              >
+                <span className={styles.avatar}>{(profile?.full_name ?? 'İ').charAt(0).toUpperCase()}</span>
               </button>
+              {profileMenuOpen && (
+                <div className={styles.profileDropdown} role="menu">
+                  <div className={styles.profileDropdownHead}>
+                    <span className={styles.profileDropdownName}>{profile?.full_name ?? 'İşletmeniz'}</span>
+                    <span className={styles.profileDropdownRole}>{isAdmin ? 'Yönetici' : 'Çalışan'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.profileDropdownItem}
+                    onClick={() => {
+                      setProfileMenuOpen(false)
+                      navigate('/ayarlar')
+                    }}
+                  >
+                    <SettingsIcon width={15} height={15} />
+                    Ayarlar
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.profileDropdownItem} ${styles.profileDropdownItemDanger}`}
+                    onClick={() => {
+                      setProfileMenuOpen(false)
+                      signOut()
+                    }}
+                  >
+                    <LogOutIcon width={15} height={15} />
+                    Çıkış yap
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
         <main className={styles.content}>
-          <Outlet context={{ searchQuery, setSearchPlaceholder } satisfies LayoutOutletContext} />
+          <Outlet
+            context={
+              { searchQuery: '', setSearchPlaceholder: () => {} } satisfies LayoutOutletContext
+            }
+          />
         </main>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
+import { resolveBusiness } from '../_shared/resolveBusiness.ts'
 import { SLOT_MINUTES, isAvailable, rankEligibleByFairness } from '../_shared/availability.ts'
 import { validateScheduledAt } from '../_shared/validation.ts'
 import {
@@ -13,10 +14,14 @@ import {
 // yazdığı doğal dil komutlarıyla randevu oluşturmasını sağlayan, ÇOK TURLU
 // (parse → özet göster → "evet"/düzeltme bekle → oluştur) uç nokta.
 //
-// Gerçek bir Supabase kullanıcı OTURUMU yok — kimlik SADECE gönderen telefon
+// Gerçek bir Supabase kullanıcı OTURUMU yok — kimlik gönderen telefon
 // numarasından (profiles.whatsapp_phone) çözülüyor, tıpkı müşteri
 // chatbot'unun customer_phone'a güvenmesi gibi (book-appointment). Bu yüzden
-// --no-verify-jwt İLE deploy edilir.
+// --no-verify-jwt İLE deploy edilir. Bunu, sadece TELEFON NUMARASINI bilen
+// herkesin (numara taranabilir/tahmin edilebilir) bu uc noktayi cagirip o
+// personel adina randevu olusturmasina/numara enumerate etmesine acmamak
+// icin, book-appointment ile AYNI x-api-key/resolveBusiness sarti burada da
+// zorunlu — sadece n8n'in bildigi gizli anahtari bilen cagirabilir.
 //
 // Simülatörden gerçek WhatsApp'a geçişte DEĞİŞMESİ GEREKEN TEK ŞEY: bu
 // fonksiyonu {phone, message} ile çağıran taraf (şimdi statik HTML sayfası,
@@ -136,10 +141,14 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceKey)
 
+  const business = await resolveBusiness(admin, req)
+  if (!business) return json({ error: 'Geçersiz API anahtarı' }, 401)
+
   const { data: staff } = await admin
     .from('profiles')
     .select('id, business_id, full_name')
     .eq('whatsapp_phone', phone)
+    .eq('business_id', business.id)
     .eq('is_active', true)
     .maybeSingle()
 
@@ -170,8 +179,8 @@ Deno.serve(async (req) => {
   }
   await admin.from('staff_whatsapp_attempts').insert({ phone })
 
-  const { data: business } = await admin.from('businesses').select('name').eq('id', staff.business_id).maybeSingle()
-  const businessName = business?.name ?? 'işletmeniz'
+  const { data: businessRow } = await admin.from('businesses').select('name').eq('id', staff.business_id).maybeSingle()
+  const businessName = businessRow?.name ?? 'işletmeniz'
 
   const { data: session } = await admin
     .from('staff_command_sessions')

@@ -4,10 +4,25 @@
   gap: 24px;
 }
 
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: -10px;
+}
+
 .statRow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .statRow {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 860px) {
@@ -20,6 +35,23 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.statTileClickable {
+  border: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+
+.statTileClickable:hover {
+  box-shadow: 0 4px 14px rgba(43, 43, 38, 0.1);
+  transform: translateY(-1px);
+}
+
+.statTileAlert {
+  border: 1px solid var(--danger-text);
 }
 
 .statIcon {
@@ -253,11 +285,6 @@
 
 .table tr:last-child td {
   border-bottom: none;
-}
-
-.rank {
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
 }
 
 .nameCell {

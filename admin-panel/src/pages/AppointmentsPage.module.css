@@ -223,6 +223,26 @@
   opacity: 0.5;
 }
 
+.apptRowOverdue {
+  position: relative;
+  background: var(--danger-bg);
+  margin: 0 -12px;
+  padding-left: 16px;
+  padding-right: 12px;
+  border-radius: var(--radius-sm);
+}
+
+.apptRowOverdue::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--danger-text);
+}
+
 .apptTime {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -272,14 +292,11 @@
   color: var(--text-dim);
 }
 
-.statusSelect {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 13px;
-  padding: 6px 8px;
-  width: 100%;
+.statusCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .statusBadge {
@@ -308,6 +325,18 @@
 .statusIptal {
   color: var(--danger-text);
   background: var(--danger-bg);
+}
+
+.statusGelmedi {
+  color: var(--text-dim);
+  background: var(--panel-2);
+}
+
+.overdueHint {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--danger-text);
+  letter-spacing: 0.01em;
 }
 
 .sourceNote {

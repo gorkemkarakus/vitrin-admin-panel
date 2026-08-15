@@ -1,0 +1,408 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  padding: 0;
+}
+
+.backIcon {
+  transform: rotate(180deg);
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: -10px;
+}
+
+.stickyFilter {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------- Tarih filtresi ---------- */
+
+.filterRow {
+  display: flex;
+  gap: 6px;
+}
+
+.filterBtn,
+.filterBtnActive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 9px 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filterBtnActive {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
+.customRangeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.customRangeRow input {
+  color-scheme: dark;
+}
+
+/* ---------- Ozet kartlari ---------- */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  min-width: 0;
+}
+
+.statCardSignal {
+  background: #eaf1fb;
+}
+
+.statCardOk {
+  background: #eafaf3;
+}
+
+.statCardDanger {
+  background: #fdefee;
+}
+
+.statIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.statIconSignal {
+  background: #dbe7f8;
+  color: var(--signal);
+}
+
+.statIconOk {
+  background: #d1f2e3;
+  color: var(--ok-text);
+}
+
+.statIconDanger {
+  background: #fbdedc;
+  color: var(--danger-text);
+}
+
+.statValue {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.statLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* ---------- Arama ---------- */
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+}
+
+.searchIcon {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  padding: 11px 0;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+
+.searchInput::placeholder {
+  color: var(--text-dim);
+}
+
+/* ---------- Gider ekleme formu ---------- */
+
+.expenseForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.expenseField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.expenseField label {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.expenseField input {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.15s;
+  color-scheme: dark;
+}
+
+.expenseField input:focus {
+  border-color: var(--signal);
+}
+
+.recurringToggle {
+  display: flex;
+  gap: 6px;
+}
+
+.recurringBtn,
+.recurringBtnActive {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.recurringBtnActive {
+  background: #475569;
+  border-color: #475569;
+  color: #fff;
+}
+
+.saveBtn {
+  width: auto;
+  padding: 10px 16px;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* ---------- Gider listesi ---------- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.expenseRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.expenseRow:last-child {
+  border-bottom: none;
+}
+
+.expenseRowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.expenseDescRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.expenseDesc {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.recurringBadge {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--signal);
+  background: #eaf1fb;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.unpaidBadge {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.overdueBadge {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--danger-text);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.expenseDate {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.expenseAmount {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--danger-text);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowDeleteBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowDeleteBtn:hover {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.paidToggleBtn,
+.paidToggleBtnActive {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.paidToggleBtn {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.paidToggleBtnActive {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+@media (max-width: 480px) {
+  .customRangeRow {
+    width: 100%;
+  }
+}

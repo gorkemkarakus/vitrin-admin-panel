@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import DonutChart from '../components/DonutChart'
-import Avatar, { colorForName } from '../components/Avatar'
-import { CalendarIcon, ClockIcon, CheckCircleIcon, XCircleIcon } from '../components/icons'
+import Avatar from '../components/Avatar'
+import { colorForName } from '../lib/avatarColor'
+import { CalendarIcon, ClockIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, MehIcon } from '../components/icons'
 import type { LayoutOutletContext } from '../layouts/DashboardLayout'
+import { currency } from '../lib/currency'
 import styles from './DashboardPage.module.css'
+
+const SLOT_MINUTES = 30
 
 interface Appointment {
   id: string
   service_id: string | null
   employee_id: string | null
   created_by_user_id: string | null
-  status: 'bekliyor' | 'onaylandi' | 'tamamlandi' | 'iptal'
+  status: 'bekliyor' | 'onaylandi' | 'tamamlandi' | 'iptal' | 'gelmedi'
   source: string
+  scheduled_at: string
+  duration_minutes: number | null
 }
 
 interface Service {
@@ -27,16 +33,15 @@ interface Profile {
 }
 
 const SOURCE_ORDER: { value: string; label: string; color: string }[] = [
-  { value: 'kullanici_uzerinden', label: 'Çalışan Üzerinden', color: '#3d4632' },
-  { value: 'dogrudan_musteri', label: 'Doğrudan Müşteri', color: '#8b6f47' },
-  { value: 'chatbot', label: 'Chatbot', color: '#2f5aa8' },
-  { value: 'online_randevu', label: 'Online Randevu', color: '#2f8f6b' },
-  { value: 'diger', label: 'Diğer', color: '#a1731f' },
+  { value: 'kullanici_uzerinden', label: 'Çalışan Üzerinden', color: '#004aad' },
+  { value: 'dogrudan_musteri', label: 'Doğrudan Müşteri', color: '#8b5cf6' },
+  { value: 'chatbot', label: 'Chatbot', color: '#ec4899' },
+  { value: 'online_randevu', label: 'Online Randevu', color: '#0891b2' },
+  { value: 'diger', label: 'Diğer', color: '#64748b' },
 ]
 
-const currency = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' })
-
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const { searchQuery, setSearchPlaceholder } = useOutletContext<LayoutOutletContext>()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -51,7 +56,9 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       const [{ data: appts }, { data: svcs }, { data: profs }] = await Promise.all([
-        supabase.from('appointments').select('id, service_id, employee_id, created_by_user_id, status, source'),
+        supabase
+          .from('appointments')
+          .select('id, service_id, employee_id, created_by_user_id, status, source, scheduled_at, duration_minutes'),
         supabase.from('services').select('id, price'),
         supabase.from('profiles').select('id, full_name'),
       ])
@@ -74,10 +81,21 @@ export default function DashboardPage() {
     onaylandi: appointments.filter((a) => a.status === 'onaylandi').length,
     tamamlandi: appointments.filter((a) => a.status === 'tamamlandi').length,
     iptal: appointments.filter((a) => a.status === 'iptal').length,
+    gelmedi: appointments.filter((a) => a.status === 'gelmedi').length,
   }
+  // "bekliyor" durumunda kalıp saati geçmiş, hiç sonuçlandırılmamış randevular
+  // — tek tek Randevular sayfasında fark edilmesi kolayca unutulabiliyordu,
+  // burada toplu bir sayı olarak öne çıkarıyoruz.
+  const now = Date.now()
+  const overdueCount = appointments.filter(
+    (a) =>
+      a.status === 'bekliyor' &&
+      new Date(a.scheduled_at).getTime() + (a.duration_minutes ?? SLOT_MINUTES) * 60000 < now,
+  ).length
 
-  // İptal edilenler performans/ciro hesaplarına dahil edilmiyor.
-  const counted = appointments.filter((a) => a.status !== 'iptal')
+  // İptal edilenler VE gelmeyenler performans/ciro hesaplarına dahil edilmiyor
+  // — ikisi de gerçekleşmemiş, gelir getirmemiş randevular.
+  const counted = appointments.filter((a) => a.status !== 'iptal' && a.status !== 'gelmedi')
 
   const bySource = SOURCE_ORDER.map((s) => ({
     ...s,
@@ -103,7 +121,9 @@ export default function DashboardPage() {
     entry.revenue += a.service_id ? (servicePriceById.get(a.service_id) ?? 0) : 0
     userStatsMap.set(key, entry)
   }
-  const allUserStats = Array.from(userStatsMap.values()).sort((a, b) => b.revenue - a.revenue)
+  // Cirora gore siralanmiyor — calisanlar birbiriyle kiyaslanmiyor/
+  // siralanmiyor, sadece isme gore (alfabetik) listeleniyor.
+  const allUserStats = Array.from(userStatsMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'tr'))
   const userStats = searchQuery.trim()
     ? allUserStats.filter((u) => u.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
     : allUserStats
@@ -122,6 +142,7 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.wrap}>
+      <h2 className={styles.sectionLabel}>Genel Bakış</h2>
       <div className={styles.statRow}>
         <div className={`card ${styles.statTile}`}>
           <span className={`${styles.statIcon} ${styles.statIconNeutral}`}>
@@ -137,6 +158,17 @@ export default function DashboardPage() {
           <span className={styles.statValue}>{statusCounts.bekliyor}</span>
           <span className={styles.statLabel}>Bekliyor</span>
         </div>
+        <button
+          type="button"
+          className={`card ${styles.statTile} ${styles.statTileClickable} ${overdueCount > 0 ? styles.statTileAlert : ''}`}
+          onClick={() => navigate('/randevular')}
+        >
+          <span className={`${styles.statIcon} ${styles.statIconDanger}`}>
+            <AlertTriangleIcon width={18} height={18} />
+          </span>
+          <span className={styles.statValue}>{overdueCount}</span>
+          <span className={styles.statLabel}>Süresi geçti, güncelleme bekliyor</span>
+        </button>
         <div className={`card ${styles.statTile}`}>
           <span className={`${styles.statIcon} ${styles.statIconOk}`}>
             <CheckCircleIcon width={18} height={18} />
@@ -150,6 +182,13 @@ export default function DashboardPage() {
           </span>
           <span className={styles.statValue}>{statusCounts.iptal}</span>
           <span className={styles.statLabel}>İptal</span>
+        </div>
+        <div className={`card ${styles.statTile}`}>
+          <span className={`${styles.statIcon} ${styles.statIconNeutral}`}>
+            <MehIcon width={18} height={18} />
+          </span>
+          <span className={styles.statValue}>{statusCounts.gelmedi}</span>
+          <span className={styles.statLabel}>Gelmedi</span>
         </div>
       </div>
 
@@ -254,23 +293,21 @@ export default function DashboardPage() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginBottom: 16 }}>Çalışan performans sıralaması</h2>
+        <h2 style={{ marginBottom: 16 }}>Çalışan istatistikleri</h2>
         {userStats.length === 0 ? (
           <p className={styles.empty}>Henüz veri yok.</p>
         ) : (
           <table className={styles.table}>
             <thead>
               <tr>
-                <th></th>
                 <th>Ad Soyad</th>
                 <th>Randevu sayısı</th>
                 <th>Oluşturulan ciro</th>
               </tr>
             </thead>
             <tbody>
-              {userStats.map((u, i) => (
+              {userStats.map((u) => (
                 <tr key={u.id}>
-                  <td className={styles.rank}>{i + 1}</td>
                   <td>
                     <span className={styles.nameCell}>
                       <Avatar name={u.name} size={28} />

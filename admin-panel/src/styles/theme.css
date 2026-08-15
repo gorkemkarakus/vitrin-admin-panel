@@ -1,22 +1,25 @@
 :root {
-  --bg: #f4f1ea;
+  --bg: #f1f5f9;
   --panel: #ffffff;
-  --panel-2: #faf8f3;
-  --line: #e8e4d8;
-  --text: #2b2b26;
-  --text-dim: #8a8574;
-  --signal: #3d4632;
+  --panel-2: #f8fafc;
+  --line: #e2e8f0;
+  --text: #1f2937;
+  --text-dim: #64748b;
+  --signal: #004aad;
+  --signal-2: #8b5cf6;
   --signal-text: #ffffff;
-  --teal: #8b6f47;
+  --teal: #004aad;
+  --accent-pink: #ec4899;
+  --accent-pink-bg: #fce7f3;
 
-  --ok-bg: #e3f0e6;
-  --ok-text: #2f6d40;
-  --warn-bg: #faf1de;
-  --warn-text: #a1731f;
-  --danger-bg: #fbe6e2;
-  --danger-text: #b8483a;
-  --info-bg: #e3ecfb;
-  --info-text: #2f5aa8;
+  --ok-bg: #d1fae5;
+  --ok-text: #0e9668;
+  --warn-bg: #fef3c7;
+  --warn-text: #d97706;
+  --danger-bg: #fee2e2;
+  --danger-text: #dc2626;
+  --info-bg: #dbeafe;
+  --info-text: #2563eb;
 
   --radius-sm: 8px;
   --radius-lg: 16px;
@@ -96,6 +99,28 @@ a {
 }
 
 .field input::placeholder {
+  color: #b0a996;
+}
+
+.field textarea {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  font-family: var(--font-body);
+  transition: border-color 0.15s;
+  resize: vertical;
+}
+
+.field textarea:focus {
+  border-color: var(--signal);
+}
+
+.field textarea::placeholder {
   color: #b0a996;
 }
 

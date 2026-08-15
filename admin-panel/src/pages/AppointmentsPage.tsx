@@ -3,6 +3,7 @@ import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { TIME_OPTIONS } from '../lib/timeOptions'
+import { toLocalDateString } from '../lib/date'
 import Avatar from '../components/Avatar'
 import StatusDropdown, { type StatusDropdownOption } from '../components/StatusDropdown'
 import Select from '../components/Select'
@@ -55,7 +56,7 @@ interface Appointment {
   created_by_user_id: string | null
   scheduled_at: string
   duration_minutes: number | null
-  status: 'bekliyor' | 'onaylandi' | 'tamamlandi' | 'iptal'
+  status: 'bekliyor' | 'onaylandi' | 'tamamlandi' | 'iptal' | 'gelmedi'
   source: string
   source_note: string | null
 }
@@ -73,6 +74,7 @@ const STATUS_OPTIONS: { value: Appointment['status']; label: string }[] = [
   { value: 'onaylandi', label: 'Onaylandı' },
   { value: 'tamamlandi', label: 'Tamamlandı' },
   { value: 'iptal', label: 'İptal' },
+  { value: 'gelmedi', label: 'Gelmedi' },
 ]
 
 const STATUS_CLASS: Record<Appointment['status'], string> = {
@@ -80,6 +82,7 @@ const STATUS_CLASS: Record<Appointment['status'], string> = {
   onaylandi: styles.statusOnaylandi,
   tamamlandi: styles.statusTamamlandi,
   iptal: styles.statusIptal,
+  gelmedi: styles.statusGelmedi,
 }
 
 const STATUS_DROPDOWN_OPTIONS: StatusDropdownOption[] = [
@@ -87,6 +90,7 @@ const STATUS_DROPDOWN_OPTIONS: StatusDropdownOption[] = [
   { value: 'onaylandi', label: 'Onaylandı', color: 'var(--info-text)', bg: 'var(--info-bg)' },
   { value: 'tamamlandi', label: 'Tamamlandı', color: 'var(--ok-text)', bg: 'var(--ok-bg)' },
   { value: 'iptal', label: 'İptal', color: 'var(--danger-text)', bg: 'var(--danger-bg)' },
+  { value: 'gelmedi', label: 'Gelmedi', color: 'var(--text-dim)', bg: 'var(--panel-2)' },
 ]
 
 const SLOT_MINUTES = 30
@@ -95,12 +99,7 @@ const WEEKDAY_SHORT = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
 type ViewMode = 'gunluk' | 'liste' | 'haftalik'
 
 function todayLocalDateString() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function toLocalDateString(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return toLocalDateString(new Date())
 }
 
 function timeStringToMinutes(t: string) {
@@ -169,6 +168,16 @@ export default function AppointmentsPage() {
   // islemden sonra bos "Yükleniyor…" yazisina donup yeniden cizilmiyor.
   async function loadData(silent = false) {
     if (!silent) setLoading(true)
+    // appointments tarihsiz cekiliyordu — isletme yillar boyunca biriktikce
+    // bu sorgu sinirsiz buyuyup sayfayi yavaslatirdi. Gunluk/haftalik/liste
+    // gorunumlerinin hicbiri bu aralik disina cikmiyor (liste ileri yonde en
+    // fazla 30 gun, gunluk/haftalik viewDate ile gezinse de makul bir sure
+    // disina pratikte cikilmiyor); yeni randevu olustururken de bu aralik
+    // disinda bir tarih secilmesi son derece nadir.
+    const windowStart = new Date()
+    windowStart.setFullYear(windowStart.getFullYear() - 2)
+    const windowEnd = new Date()
+    windowEnd.setFullYear(windowEnd.getFullYear() + 1)
     const [
       { data: appts },
       { data: custs },
@@ -183,6 +192,8 @@ export default function AppointmentsPage() {
         .select(
           'id, customer_id, service_id, employee_id, created_by_user_id, scheduled_at, duration_minutes, status, source, source_note',
         )
+        .gte('scheduled_at', windowStart.toISOString())
+        .lte('scheduled_at', windowEnd.toISOString())
         .order('scheduled_at', { ascending: true }),
       supabase.from('customers').select('id, full_name, phone').order('full_name'),
       supabase
@@ -256,7 +267,7 @@ export default function AppointmentsPage() {
 
     const end = new Date(start.getTime() + durationMinutes * 60000)
     const hasConflict = appointments.some((a) => {
-      if (a.employee_id !== employeeId || a.status === 'iptal') return false
+      if (a.employee_id !== employeeId || a.status === 'iptal' || a.status === 'gelmedi') return false
       const aStart = new Date(a.scheduled_at)
       const aEnd = new Date(aStart.getTime() + (a.duration_minutes ?? SLOT_MINUTES) * 60000)
       return aStart < end && aEnd > start
@@ -360,6 +371,8 @@ export default function AppointmentsPage() {
       setSourceNote('')
       await loadData(true)
       setShowForm(false)
+    } catch {
+      setError('Sunucuya ulaşılamadı, tekrar deneyin.')
     } finally {
       setSubmitting(false)
     }

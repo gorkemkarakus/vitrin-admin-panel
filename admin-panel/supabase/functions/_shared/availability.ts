@@ -142,6 +142,36 @@ export function listOpenSlots(
 // ['chatbot','online_randevu'] ile cagirir — boylece iki kimliksiz/otomatik
 // kanal TEK ortak adalet havuzunda sayilir, calisanin KENDI getirdigi
 // musteriler (source disinda kalanlar) bu siralamayi hic etkilemez.
+export interface NextAvailableSlot {
+  employeeId: string
+  scheduledAt: Date
+}
+
+// book-appointment/index.ts'teki ayni isimli LOCAL fonksiyonun generic/export
+// edilmis hali — reschedule-appointment de aynı "ileri dogru 30dk'lik
+// adimlarla tara" mantigina ihtiyac duyuyor. book-appointment'in kendisi
+// BILEREK degistirilmedi (iki repo arasinda zaten var olan bir surukleniz
+// var, bu isin kapsaminda o ayrica duzeltilmiyor) — bu sadece yeni,
+// ek bir fonksiyon.
+export function findNextAvailable(
+  from: Date,
+  eligibleIds: string[],
+  durationMinutes: number,
+  schedules: Schedule[],
+  appointments: Appt[],
+  timeBlocks: TimeBlock[],
+  searchDays: number,
+): NextAvailableSlot | null {
+  const stepMs = SLOT_MINUTES * 60000
+  const searchStart = new Date(Math.ceil((from.getTime() + 1) / stepMs) * stepMs)
+  const searchEnd = new Date(from.getTime() + searchDays * 24 * 60 * 60000)
+  for (let t = searchStart; t <= searchEnd; t = new Date(t.getTime() + stepMs)) {
+    const found = eligibleIds.find((id) => isAvailable(id, t, durationMinutes, schedules, appointments, timeBlocks))
+    if (found) return { employeeId: found, scheduledAt: t }
+  }
+  return null
+}
+
 export function rankEligibleByFairness(eligibleIds: string[], appointments: Appt[], rotationSources: string[]): string[] {
   const lastBookingByEmployee = new Map<string, number>()
   for (const a of appointments) {

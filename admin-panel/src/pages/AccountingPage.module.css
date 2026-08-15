@@ -1,68 +1,208 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
-.filterCard {
+.stickyFilter {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.presetRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.presetBtn {
-  width: auto;
-  padding: 8px 14px;
-}
-
-.presetBtnActive {
-  border-color: var(--signal);
-  color: var(--signal);
-}
-
-.rangeRow {
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.rangeField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 170px;
-}
-
-.rangeField label {
-  font-size: 12px;
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-dim);
-  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: -10px;
 }
 
-.rangeField input {
-  width: 100%;
-  background: var(--panel-2);
+/* ---------- Tarih filtresi ---------- */
+
+.filterRow {
+  display: flex;
+  gap: 6px;
+}
+
+.filterBtn,
+.filterBtnActive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  color: var(--text);
-  font-size: 14px;
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 9px 8px;
+  font-size: 12.5px;
+  font-weight: 600;
   font-family: var(--font-body);
-  outline: none;
-  transition: border-color 0.15s;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filterBtnActive {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
+.customRangeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.customRangeRow input {
   color-scheme: dark;
 }
 
-.rangeField input:focus {
-  border-color: var(--signal);
+.exportBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-weight: 600;
 }
+
+/* ---------- Donem ozeti kartlari ---------- */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  min-width: 0;
+}
+
+.statCardSignal {
+  background: #eaf1fb;
+}
+
+.statCardOk {
+  background: #eafaf3;
+}
+
+.statCardDanger {
+  background: #fdefee;
+}
+
+.statCardInfo {
+  background: #eaf2fd;
+}
+
+.statIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.statIconSignal {
+  background: #dbe7f8;
+  color: var(--signal);
+}
+
+.statIconOk {
+  background: #d1f2e3;
+  color: var(--ok-text);
+}
+
+.statIconDanger {
+  background: #fbdedc;
+  color: var(--danger-text);
+}
+
+.statIconInfo {
+  background: #d3e6fb;
+  color: var(--info-text);
+}
+
+.statValue {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.statLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* ---------- Donem hesaplama dokumu ---------- */
+
+.waterfall {
+  display: flex;
+  flex-direction: column;
+}
+
+.waterfallRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+
+.waterfallRow:last-child {
+  border-bottom: none;
+}
+
+.waterfallMinus {
+  color: var(--danger-text);
+}
+
+.waterfallSubtotal {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.waterfallNet {
+  padding-top: 14px;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ok-text);
+  border-top: 1px solid var(--line);
+}
+
+.waterfallNetDanger {
+  color: var(--danger-text);
+}
+
+/* ---------- Vergi & prim ayarlari ---------- */
 
 .rateRow {
   display: flex;
@@ -107,111 +247,40 @@
 
 .savedHint {
   font-size: 13px;
-  color: var(--teal);
+  color: var(--ok-text);
+  font-weight: 600;
 }
 
-.waterfall {
+/* ---------- Arama ---------- */
+
+.searchBox {
   display: flex;
-  flex-direction: column;
-}
-
-.waterfallRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 0;
-  font-size: 14px;
-  border-bottom: 1px solid var(--line);
-  font-variant-numeric: tabular-nums;
-}
-
-.waterfallRow:last-child {
-  border-bottom: none;
-}
-
-.waterfallMinus {
-  color: var(--text-dim);
-}
-
-.waterfallSubtotal {
-  color: var(--text-dim);
-  font-size: 13px;
-}
-
-.waterfallNet {
-  padding-top: 14px;
-  font-family: var(--font-heading);
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--teal);
-  border-top: 1px solid var(--line);
-}
-
-.expenseForm {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-
-.expenseField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 160px;
-}
-
-.expenseField label {
-  font-size: 12px;
-  color: var(--text-dim);
-  font-weight: 500;
-}
-
-.expenseField input {
-  width: 100%;
-  background: var(--panel-2);
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  color: var(--text);
+  padding: 0 12px;
+}
+
+.searchIcon {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  padding: 11px 0;
   font-size: 14px;
   font-family: var(--font-body);
-  outline: none;
-  transition: border-color 0.15s;
-  color-scheme: dark;
+  color: var(--text);
 }
 
-.expenseField input:focus {
-  border-color: var(--signal);
-}
-
-.statRow {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-@media (max-width: 860px) {
-  .statRow {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.statTile {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.statValue {
-  font-family: var(--font-heading);
-  font-size: 28px;
-  font-weight: 500;
-}
-
-.statLabel {
-  font-size: 12px;
+.searchInput::placeholder {
   color: var(--text-dim);
 }
 
@@ -220,37 +289,126 @@
   font-size: 13px;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+/* ---------- Giderler ozet karti ---------- */
+
+.giderlerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
-.table th {
-  text-align: left;
-  color: var(--text-dim);
-  font-weight: 500;
-  font-size: 12px;
-  padding: 10px 12px;
+.sectionLink {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--signal);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.giderMiniGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .giderMiniGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ---------- Liste satirlari (calisan / hizmet ciro) ---------- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.employeeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
   border-bottom: 1px solid var(--line);
 }
 
-.table td {
-  padding: 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.table tr:last-child td {
+.employeeRow:last-child {
   border-bottom: none;
 }
 
 .rank {
+  width: 16px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 700;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 
-.nameCell {
+.employeeName {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.employeeStats {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.employeeStatBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+/* Tutar (Ciro/Kazanc) her zaman son blok — degeri satirdan satira genislik
+   olarak cok degisebildigi (7 TL / 546.265 TL) icin sabit bir min-width
+   verilmezse "Randevu" blogu her satirda farkli bir yatay konuma kayardi
+   (sutun hizasi bozuluyordu, bildirildi). */
+.employeeStatBlock:last-child {
+  min-width: 84px;
+}
+
+.employeeStatLabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.employeeStatValue {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.employeeStatValueSignal {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--signal);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .rangeField,
+  .customRangeRow {
+    width: 100%;
+  }
+
+  .waterfallRow {
+    font-size: 13px;
+  }
 }

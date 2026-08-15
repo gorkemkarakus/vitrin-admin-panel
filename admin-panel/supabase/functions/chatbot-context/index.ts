@@ -300,6 +300,31 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Bot bugune kadar musterinin var olan randevularini HIC gormuyordu — tek
+  // "randevu var mi" tespiti kendi gecmis mesajlarinda "Randevunuz
+  // oluşturuldu ✅" cumlesini aramaktan ibaretti (kirilgan, id'siz). Iptal/
+  // erteleme ozelligi icin LLM'e gercek, id'li bir liste veriliyor —
+  // Turkce bicimlendirme burada YAPILMIYOR (services/working_hours'daki
+  // aynı kural: ham veri edge function'dan, Turkce metin n8n'den).
+  let appointments: { id: string; service_name: string | null; employee_name: string | null; scheduled_at: string }[] = []
+  if (customer) {
+    const profileNameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]))
+    const { data: upcoming } = await admin
+      .from('appointments')
+      .select('id, scheduled_at, service_id, employee_id')
+      .eq('business_id', business.id)
+      .eq('customer_id', customer.id)
+      .in('status', ['bekliyor', 'onaylandi'])
+      .gt('scheduled_at', new Date().toISOString())
+      .order('scheduled_at', { ascending: true })
+    appointments = (upcoming ?? []).map((a) => ({
+      id: a.id,
+      service_name: a.service_id ? (serviceNameById.get(a.service_id) ?? null) : null,
+      employee_name: a.employee_id ? (profileNameById.get(a.employee_id) ?? null) : null,
+      scheduled_at: a.scheduled_at,
+    }))
+  }
+
   const persistedName = customer?.full_name && customer.full_name !== 'Müşteri' ? customer.full_name : null
   const persistedPhone = customer?.contact_phone ?? null
   // Personel WhatsApp Coexistence uzerinden telefon uygulamasindan elle
@@ -324,6 +349,7 @@ Deno.serve(async (req) => {
       })),
       employees,
       working_hours: workingHours,
+      appointments,
       history: (history ?? []).reverse().map((h) => ({ role: h.role, content: h.content })),
     },
     200,

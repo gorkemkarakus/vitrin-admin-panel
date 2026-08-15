@@ -8,7 +8,13 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // devam eder.
 export async function sendCustomerMessage(
   admin: SupabaseClient,
-  params: { businessId: string; customerId: string | null; phone: string | null; kind: 'confirmation' | 'reminder'; message: string },
+  params: {
+    businessId: string
+    customerId: string | null
+    phone: string | null
+    kind: 'confirmation' | 'reminder' | 'bulk_campaign'
+    message: string
+  },
 ): Promise<{ ok: boolean; error?: string }> {
   if (!params.phone) {
     return { ok: false, error: 'Müşteri telefonu yok, bildirim atlandı' }

@@ -1,0 +1,83 @@
+.backdrop {
+  composes: backdrop from '../styles/modal.module.css';
+}
+
+.card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  padding: 24px 22px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--info-bg);
+  color: var(--signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.iconError {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.step {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  min-height: 16px;
+  margin-top: 2px;
+}
+
+.track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--signal);
+  transition: width 0.2s ease;
+}
+
+.pct {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--signal);
+  font-variant-numeric: tabular-nums;
+}
+
+.errorText {
+  font-size: 12.5px;
+  color: var(--danger-text);
+  margin-top: 4px;
+}
+
+.closeBtn {
+  margin-top: 16px;
+  width: 100%;
+}

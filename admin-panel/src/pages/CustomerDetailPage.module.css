@@ -1,0 +1,506 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  padding: 0;
+}
+
+.backIcon {
+  transform: rotate(180deg);
+}
+
+.insightsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.insightTile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  background: var(--panel-2);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.insightIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.insightValue {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightSub {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.headerCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.headerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headerName {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.headerLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.editCustomerBtn {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: flex-start;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--panel-2);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editCustomerBtn:hover {
+  background: var(--info-bg);
+  color: var(--signal);
+}
+
+.balanceRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.creditBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--ok-bg);
+  border-radius: var(--radius-lg);
+  padding: 13px 16px;
+}
+
+.creditBannerLeft {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ok-text);
+}
+
+.creditBannerIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--ok-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.creditBannerValue {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ok-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.balanceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.balanceLabel {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.balanceValueOk {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ok-text);
+}
+
+.balanceValueDanger {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--danger-text);
+}
+
+.payBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--signal);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.payBtn:hover {
+  opacity: 0.92;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.packageRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.packageRow:last-child {
+  border-bottom: none;
+}
+
+.packageRowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+
+.sessionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.sessionRowLabel {
+  color: var(--text-dim);
+  flex-shrink: 0;
+  width: 54px;
+}
+
+.sessionRowDate {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionRowStatus {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.sessionRowStatus_bekliyor {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.sessionRowStatus_onaylandi {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.sessionRowStatus_tamamlandi {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.sessionRowStatus_iptal {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.sessionRowStatus_gelmedi {
+  background: var(--panel-2);
+  color: var(--text-dim);
+}
+
+.packageRowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.packageRowName {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.packageDoneBadge {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ok-text);
+  background: var(--ok-bg);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.packageRowProgress {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.packageRowStats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.packageRowExpected {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.packageRowRemainingOk {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ok-text);
+}
+
+.packageRowRemainingDanger {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger-text);
+}
+
+.paymentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.paymentRow:last-child {
+  border-bottom: none;
+}
+
+.paymentRowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.editPaymentBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editPaymentBtn:hover {
+  background: var(--info-bg);
+  color: var(--signal);
+}
+
+.paymentRowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.voidPaymentBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voidPaymentBtn:hover {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.paymentRowAmount {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ok-text);
+}
+
+.paymentRowMeta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.paymentRowVoided {
+  opacity: 0.55;
+}
+
+.paymentRowVoided .paymentRowAmount {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.voidedBadge {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+
+/* ---------- Odeme al modali ---------- */
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 41, 55, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 24px;
+  overflow-y: auto;
+  z-index: 80;
+}
+
+.modalCard {
+  width: 100%;
+  max-width: 420px;
+}
+
+.modalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  padding: 4px;
+}
+
+.modalClose:hover {
+  color: var(--text);
+}
+
+.error {
+  color: var(--danger-text);
+  font-size: 13px;
+  margin-bottom: 16px;
+}

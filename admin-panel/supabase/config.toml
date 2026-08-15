@@ -10,6 +10,12 @@
 [functions.book-appointment]
 verify_jwt = false
 
+[functions.cancel-appointment]
+verify_jwt = false
+
+[functions.reschedule-appointment]
+verify_jwt = false
+
 [functions.public-book-appointment]
 verify_jwt = false
 
@@ -25,6 +31,15 @@ verify_jwt = false
 [functions.process-appointment-reminders]
 verify_jwt = false
 
+[functions.refresh-ad-tokens]
+verify_jwt = false
+
+[functions.sync-ad-insights]
+verify_jwt = false
+
+[functions.meta-oauth-bridge]
+verify_jwt = false
+
 # Gercek Supabase kullanici JWT'si (Authorization header) gerektiren
 # fonksiyonlar — varsayilan zaten budur, tutarlilik icin acikca yazildi.
 [functions.chatbot-context]
@@ -37,6 +52,27 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.create-team-member]
+verify_jwt = true
+
+[functions.meta-oauth-callback]
+verify_jwt = true
+
+[functions.select-ad-account]
+verify_jwt = true
+
+[functions.disconnect-ad-account]
+verify_jwt = true
+
+[functions.get-ad-insights]
+verify_jwt = true
+
+[functions.generate-ai-insights]
+verify_jwt = true
+
+[functions.send-bulk-campaign]
+verify_jwt = true
+
+[functions.generate-campaign-message]
 verify_jwt = true
 
 [functions.operator-businesses]
