@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import { TIME_OPTIONS } from '../lib/timeOptions'
 import { toLocalDateString } from '../lib/date'
@@ -187,15 +188,15 @@ export default function AppointmentsPage() {
       { data: scheds },
       { data: blocks },
     ] = await Promise.all([
-      supabase
+      fetchAll(() => supabase
         .from('appointments')
         .select(
           'id, customer_id, service_id, employee_id, created_by_user_id, scheduled_at, duration_minutes, status, source, source_note',
         )
         .gte('scheduled_at', windowStart.toISOString())
         .lte('scheduled_at', windowEnd.toISOString())
-        .order('scheduled_at', { ascending: true }),
-      supabase.from('customers').select('id, full_name, phone').order('full_name'),
+        .order('scheduled_at', { ascending: true }).order('id')),
+      fetchAll(() => supabase.from('customers').select('id, full_name, phone').order('full_name').order('id')),
       supabase
         .from('services')
         .select('id, name, duration_minutes, price')
@@ -225,8 +226,10 @@ export default function AppointmentsPage() {
   const serviceName = (id: string | null) => services.find((s) => s.id === id)?.name ?? '—'
   const employeeName = (id: string | null) => profiles.find((p) => p.id === id)?.full_name ?? '—'
 
+  // Calisan: kendi actigi randevular + kendisine atanmis olanlar (bot, online
+  // sayfa ya da yoneticinin actigi) — appointments_update_assigned politikasi.
   function canEdit(appt: Appointment) {
-    return profile?.role === 'admin' || appt.created_by_user_id === profile?.id
+    return profile?.role === 'admin' || appt.created_by_user_id === profile?.id || appt.employee_id === profile?.id
   }
 
   const selectedService = services.find((s) => s.id === serviceId) ?? null

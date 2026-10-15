@@ -7,6 +7,7 @@ import { currency } from '../lib/currency'
 import Avatar from '../components/Avatar'
 import Select from '../components/Select'
 import { ChevronRightIcon, PhoneIcon, MailIcon, WalletIcon, PencilIcon, TrashIcon, ClockIcon, ServicesIcon, TrendingUpIcon, CalendarIcon } from '../components/icons'
+import { toLocalDateString } from '../lib/date'
 import styles from './CustomerDetailPage.module.css'
 
 interface Customer {
@@ -319,6 +320,9 @@ export default function CustomerDetailPage() {
       const package_id = payTarget.startsWith('pkg:') ? payTarget.slice(4) : null
       const appointment_id = payTarget.startsWith('appt:') ? payTarget.slice(5) : null
       const { error: insertErr } = await supabase.from('payments').insert({
+        // paid_at bir date kolonu; varsayilani sunucunun (UTC) CURRENT_DATE'i —
+        // Turkiye'de 00:00-03:00 arasi alinan odeme bir onceki gune yazilirdi.
+        paid_at: toLocalDateString(new Date()),
         business_id: profile?.business_id,
         customer_id: id,
         appointment_id,

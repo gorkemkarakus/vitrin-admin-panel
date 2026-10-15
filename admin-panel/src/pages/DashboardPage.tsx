@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import DonutChart from '../components/DonutChart'
 import Avatar from '../components/Avatar'
 import { colorForName } from '../lib/avatarColor'
@@ -56,9 +57,9 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       const [{ data: appts }, { data: svcs }, { data: profs }] = await Promise.all([
-        supabase
+        fetchAll(() => supabase
           .from('appointments')
-          .select('id, service_id, employee_id, created_by_user_id, status, source, scheduled_at, duration_minutes'),
+          .select('id, service_id, employee_id, created_by_user_id, status, source, scheduled_at, duration_minutes').order('id')),
         supabase.from('services').select('id, price'),
         supabase.from('profiles').select('id, full_name'),
       ])

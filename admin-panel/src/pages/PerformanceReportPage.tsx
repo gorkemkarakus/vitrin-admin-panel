@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import Avatar from '../components/Avatar'
 import PdfProgressModal from '../components/PdfProgressModal'
 import {
@@ -168,20 +169,20 @@ export default function PerformanceReportPage() {
         { data: settings },
       ] = await Promise.all([
         supabase.from('profiles').select('id, full_name').order('full_name'),
-        supabase
+        fetchAll(() => supabase
           .from('appointments')
           .select('id, employee_id, customer_id, service_id, status, scheduled_at, duration_minutes, price_override, source')
           .gte('scheduled_at', `${rangeStart}T00:00:00`)
-          .lte('scheduled_at', `${rangeEnd}T23:59:59`),
+          .lte('scheduled_at', `${rangeEnd}T23:59:59`).order('id')),
         supabase.from('services').select('id, name, price'),
         supabase.from('employee_schedules').select('profile_id, day_of_week, starts_at, ends_at'),
         supabase.from('employee_time_blocks').select('profile_id, day_of_week, block_date, end_date, starts_at, ends_at'),
-        supabase
+        fetchAll(() => supabase
           .from('payments')
           .select('amount, paid_at, appointment_id')
           .is('voided_at', null)
           .gte('paid_at', rangeStart)
-          .lte('paid_at', rangeEnd),
+          .lte('paid_at', rangeEnd).order('id')),
         supabase.from('employee_services').select('profile_id, service_id'),
         supabase.from('business_finance_settings').select('commission_pct').maybeSingle(),
       ])

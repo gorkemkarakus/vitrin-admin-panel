@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import { TIME_OPTIONS } from '../lib/timeOptions'
 import { toLocalDateString } from '../lib/date'
 import Avatar from '../components/Avatar'
@@ -323,12 +324,12 @@ export default function EmployeeLeavesPage() {
       supabase.from('employee_services').select('profile_id, service_id'),
       supabase.from('employee_schedules').select('profile_id, day_of_week, starts_at, ends_at'),
       supabase.from('employee_time_blocks').select('profile_id, day_of_week, block_date, end_date, starts_at, ends_at'),
-      supabase
+      fetchAll(() => supabase
         .from('appointments')
         .select('id, employee_id, scheduled_at, duration_minutes, status')
         .neq('status', 'iptal')
         .gte('scheduled_at', `${range.min}T00:00:00`)
-        .lte('scheduled_at', `${range.max}T23:59:59`),
+        .lte('scheduled_at', `${range.max}T23:59:59`).order('id')),
     ])
     setOtherProfiles(profs ?? [])
     setEmployeeServices(svcAssignments ?? [])

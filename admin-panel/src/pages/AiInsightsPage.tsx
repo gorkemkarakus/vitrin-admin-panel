@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import {
   SparkleIcon,
   TrendingUpIcon,
@@ -148,10 +149,10 @@ export default function AiInsightsPage() {
     async function loadLiveData() {
       setDataLoading(true)
       const [{ data: appts }, { data: pays }, { data: custs }, { data: exps }, { data: settings }] = await Promise.all([
-        supabase.from('appointments').select('id, customer_id, status, scheduled_at'),
-        supabase.from('payments').select('customer_id, amount, paid_at, voided_at'),
-        supabase.from('customers').select('id, created_at'),
-        supabase.from('business_expenses').select('amount, expense_date, is_paid'),
+        fetchAll(() => supabase.from('appointments').select('id, customer_id, status, scheduled_at').order('id')),
+        fetchAll(() => supabase.from('payments').select('customer_id, amount, paid_at, voided_at').order('id')),
+        fetchAll(() => supabase.from('customers').select('id, created_at').order('id')),
+        fetchAll(() => supabase.from('business_expenses').select('amount, expense_date, is_paid').order('id')),
         supabase.from('business_finance_settings').select('commission_pct, tax_pct').maybeSingle(),
       ])
       setAppointments(appts ?? [])

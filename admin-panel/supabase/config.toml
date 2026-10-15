@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.meta-oauth-bridge]
 verify_jwt = false
 
+[functions.whatsapp-webhook]
+verify_jwt = false
+
 # Gercek Supabase kullanici JWT'si (Authorization header) gerektiren
 # fonksiyonlar — varsayilan zaten budur, tutarlilik icin acikca yazildi.
 [functions.chatbot-context]

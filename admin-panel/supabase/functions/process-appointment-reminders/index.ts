@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
   const { data: businesses } = await admin
     .from('businesses')
-    .select('id, name, reminder_hours_before')
+    .select('id, name, reminder_hours_before, whatsapp_phone_number_id')
     .not('reminder_hours_before', 'is', null)
   if (!businesses || businesses.length === 0) return json({ ok: true, sent: 0 }, 200)
 
@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
       businessId: appt.business_id,
       customerId: appt.customer_id,
       phone,
+      phoneNumberId: business?.whatsapp_phone_number_id ?? null,
       kind: 'reminder',
       message: text,
     })

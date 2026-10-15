@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import PdfProgressModal from '../components/PdfProgressModal'
 import {
@@ -98,23 +99,23 @@ export default function AccountingPage() {
     setLoading(true)
     const [{ data: appts }, { data: svcs }, { data: profs }, { data: settings }, { data: exps }, { data: pkgs }, { data: pays }] =
       await Promise.all([
-        supabase.from('appointments').select('id, service_id, employee_id, scheduled_at, status'),
+        fetchAll(() => supabase.from('appointments').select('id, service_id, employee_id, scheduled_at, status').order('id')),
         supabase.from('services').select('id, name, price'),
         supabase.from('profiles').select('id, full_name'),
         supabase.from('business_finance_settings').select('commission_pct, tax_pct').maybeSingle(),
-        supabase
+        fetchAll(() => supabase
           .from('business_expenses')
           .select('id, description, amount, expense_date, due_date, is_recurring, is_paid')
           .gte('expense_date', rangeStart)
           .lte('expense_date', rangeEnd)
-          .order('expense_date', { ascending: false }),
-        supabase.from('service_packages').select('id, service_id'),
-        supabase
+          .order('expense_date', { ascending: false }).order('id')),
+        fetchAll(() => supabase.from('service_packages').select('id, service_id').order('id')),
+        fetchAll(() => supabase
           .from('payments')
           .select('id, amount, appointment_id, package_id')
           .is('voided_at', null)
           .gte('paid_at', rangeStart)
-          .lte('paid_at', rangeEnd),
+          .lte('paid_at', rangeEnd).order('id')),
       ])
     setAppointments(appts ?? [])
     setServices(svcs ?? [])

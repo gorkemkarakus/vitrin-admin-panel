@@ -75,8 +75,14 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceKey)
 
-  const { data: business } = await admin.from('businesses').select('id').eq('slug', slug).maybeSingle()
+  const { data: business } = await admin.from('businesses').select('*').eq('slug', slug).maybeSingle()
   if (!business) return json({ error: 'İşletme bulunamadı' }, 404)
+  // Yonetici Ayarlar'dan online randevuyu kapattiysa. select('*'):
+  // online_booking_enabled kolonu henuz yoksa (migration oncesi) sorgu
+  // bozulmasin, sayfa acik kabul edilsin.
+  if (business.online_booking_enabled === false) {
+    return json({ error: 'Bu salon şu an online randevu almıyor.', closed: true }, 403)
+  }
 
   // Kötüye kullanım koruması: aynı telefon numarasından saatte 5'ten, aynı
   // IP'den saatte 10'dan fazla deneme varsa reddet — bir script farklı sahte

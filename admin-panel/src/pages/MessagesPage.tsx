@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import Avatar from '../components/Avatar'
 import { MessagesIcon, ClockIcon } from '../components/icons'
@@ -71,7 +72,7 @@ export default function MessagesPage() {
         .select('role, content, customer_phone, created_at')
         .order('created_at', { ascending: false })
         .limit(RECENT_MESSAGES_LIMIT),
-      supabase.from('customers').select('id, full_name, phone, bot_paused_until'),
+      fetchAll(() => supabase.from('customers').select('id, full_name, phone, bot_paused_until').order('id')),
     ])
 
     const customerByPhone = new Map((customers ?? []).filter((c) => c.phone).map((c) => [c.phone as string, c]))

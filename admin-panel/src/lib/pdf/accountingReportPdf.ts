@@ -1,4 +1,6 @@
+import { toLocalDateString } from '../date'
 import { supabase } from '../supabase'
+import { fetchAll } from '../fetchAll'
 import { currency } from '../currency'
 import { PdfReport } from './pdfDoc'
 import { saveAndSharePdf } from './savePdf'
@@ -89,13 +91,13 @@ export async function generateAccountingReportPdf(params: {
   onProgress(4, 'İşletme bilgileri alınıyor…')
   const [{ data: business }, { data: pays }] = await Promise.all([
     supabase.from('businesses').select('name').eq('id', businessId).maybeSingle(),
-    supabase
+    fetchAll(() => supabase
       .from('payments')
       .select('id, amount, method, paid_at, appointment_id, package_id')
       .is('voided_at', null)
       .gte('paid_at', rangeStart)
       .lte('paid_at', rangeEnd)
-      .order('paid_at', { ascending: true }),
+      .order('paid_at', { ascending: true }).order('id')),
   ])
   const businessName = business?.name ?? 'İşletme'
   const payments = pays ?? []
@@ -133,7 +135,7 @@ export async function generateAccountingReportPdf(params: {
   if (expenses.length === 0) {
     report.addSubText('Bu aralıkta gider kaydı yok.')
   } else {
-    const todayStr = new Date().toISOString().slice(0, 10)
+    const todayStr = toLocalDateString(new Date())
     report.addTable({
       head: ['Tarih', 'Son Ödeme', 'Açıklama', 'Tekrar', 'Durum', 'Tutar'],
       body: expenses

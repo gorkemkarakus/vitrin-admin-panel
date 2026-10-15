@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import {
   UsersIcon,
   SendIcon,
@@ -86,11 +87,11 @@ export default function TopluMesajPage() {
     setLoading(true)
     const [{ data: custs }, { data: appts }, { data: svcs }, { data: groups }, { data: members }, { data: tmpls }] =
       await Promise.all([
-        supabase.from('customers').select('id, full_name, phone, contact_phone'),
-        supabase.from('appointments').select('customer_id, service_id, status, scheduled_at'),
+        fetchAll(() => supabase.from('customers').select('id, full_name, phone, contact_phone').order('id')),
+        fetchAll(() => supabase.from('appointments').select('customer_id, service_id, status, scheduled_at').order('id')),
         supabase.from('services').select('id, name'),
         supabase.from('customer_groups').select('id, name, description').order('created_at', { ascending: false }),
-        supabase.from('customer_group_members').select('group_id, customer_id'),
+        fetchAll(() => supabase.from('customer_group_members').select('group_id, customer_id').order('id')),
         supabase.from('campaign_message_templates').select('id, title, message').order('created_at', { ascending: false }),
       ])
     setCustomers(custs ?? [])

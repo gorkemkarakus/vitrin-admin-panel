@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       ? admin.from('customers').select('full_name, phone, contact_phone').eq('id', appt.customer_id).maybeSingle()
       : Promise.resolve({ data: null }),
     appt.service_id ? admin.from('services').select('name').eq('id', appt.service_id).maybeSingle() : Promise.resolve({ data: null }),
-    admin.from('businesses').select('name').eq('id', appt.business_id).maybeSingle(),
+    admin.from('businesses').select('name, whatsapp_phone_number_id').eq('id', appt.business_id).maybeSingle(),
   ])
 
   const phone = customer?.contact_phone || customer?.phone || null
@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
     businessId: appt.business_id,
     customerId: appt.customer_id,
     phone,
+    phoneNumberId: business?.whatsapp_phone_number_id ?? null,
     kind: 'confirmation',
     message: text,
   })

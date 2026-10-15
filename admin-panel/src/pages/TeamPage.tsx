@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import {
   SearchIcon,
   FilterIcon,
@@ -108,8 +109,8 @@ export default function TeamPage() {
         .order('role', { ascending: false })
         .order('full_name'),
       supabase.from('employee_time_blocks').select('profile_id, block_date, end_date'),
-      supabase.from('appointments').select('id, employee_id, service_id, status, scheduled_at'),
-      supabase.from('payments').select('id, amount, appointment_id').is('voided_at', null).eq('paid_at', todayLocalDateString()),
+      fetchAll(() => supabase.from('appointments').select('id, employee_id, service_id, status, scheduled_at').order('id')),
+      fetchAll(() => supabase.from('payments').select('id, amount, appointment_id').is('voided_at', null).eq('paid_at', todayLocalDateString()).order('id')),
     ])
     setEmployees(profs ?? [])
     setTimeBlocks(blocks ?? [])

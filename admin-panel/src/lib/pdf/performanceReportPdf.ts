@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { fetchAll } from '../fetchAll'
 import { SOURCE_LABEL } from '../sourceLabels'
 import { currencyWhole as currency } from '../currency'
 import { PdfReport } from './pdfDoc'
@@ -67,7 +68,7 @@ export async function generatePerformanceReportPdf(params: {
   onProgress(4, 'İşletme bilgileri alınıyor…')
   const [{ data: business }, { data: customers }] = await Promise.all([
     supabase.from('businesses').select('name').eq('id', businessId).maybeSingle(),
-    supabase.from('customers').select('id, full_name'),
+    fetchAll(() => supabase.from('customers').select('id, full_name').order('id')),
   ])
   const businessName = business?.name ?? 'İşletme'
   const customerById = new Map((customers ?? []).map((c) => [c.id, c.full_name]))

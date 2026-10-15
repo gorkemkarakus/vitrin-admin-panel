@@ -13,9 +13,9 @@ Deno.serve(async (req) => {
   if (!auth.ok) return auth.response
   const { businessId, admin } = auth
 
-  // Gercek gonderim baglaninca (bkz. _shared/notify.ts TODO) her tetikleme
-  // gercek WhatsApp mesaji anlamina gelecek — calinmis/kotuye kullanilan bir
-  // admin oturumu isletme basina saatte 10 kampanyayla sinirlandiriliyor
+  // Her tetikleme artik gercek bir WhatsApp mesaji anlamina geliyor
+  // (_shared/notify.ts) — calinmis/kotuye kullanilan bir admin oturumu
+  // isletme basina saatte 10 kampanyayla sinirlandiriliyor
   // (parse-appointment-command/staff-whatsapp-webhook ile ayni desen).
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
   await admin.from('bulk_campaign_attempts').delete().lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
@@ -36,6 +36,12 @@ Deno.serve(async (req) => {
   if (customerIds.length === 0) return json({ error: 'Alıcı listesi boş' }, 400)
   if (customerIds.length > MAX_RECIPIENTS) return json({ error: `En fazla ${MAX_RECIPIENTS} alıcıya tek seferde gönderilebilir` }, 400)
   if (!message) return json({ error: 'Mesaj metni boş olamaz' }, 400)
+
+  const { data: business } = await admin
+    .from('businesses')
+    .select('whatsapp_phone_number_id')
+    .eq('id', businessId)
+    .maybeSingle()
 
   // Sadece BU isletmeye ait musteriler — baska bir isletmenin customer_id'sini
   // gecirip veri sizdirmayi engeller (RLS zaten service_role ile bypass
@@ -59,6 +65,7 @@ Deno.serve(async (req) => {
       businessId,
       customerId: c.id,
       phone,
+      phoneNumberId: business?.whatsapp_phone_number_id ?? null,
       kind: 'bulk_campaign',
       message,
     })

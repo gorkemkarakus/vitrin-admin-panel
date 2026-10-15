@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import type { LayoutOutletContext } from '../layouts/DashboardLayout'
 import { currency } from '../lib/currency'
@@ -48,11 +49,11 @@ export default function ServicesPage() {
         .select('id, name, duration_minutes, price, is_active, description')
         .order('is_active', { ascending: false })
         .order('name', { ascending: true }),
-      supabase
+      fetchAll(() => supabase
         .from('appointments')
         .select('service_id')
         .eq('status', 'tamamlandi')
-        .gte('scheduled_at', `${firstOfMonth()}T00:00:00`),
+        .gte('scheduled_at', `${firstOfMonth()}T00:00:00`).order('id')),
     ])
     setServices(data ?? [])
     setServicePrices(new Map((data ?? []).map((s) => [s.id, s.price ?? 0])))

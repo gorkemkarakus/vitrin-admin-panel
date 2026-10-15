@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import Avatar from '../components/Avatar'
 import { SearchIcon, FilterIcon, CheckCircleIcon, UsersIcon, UserPlusIcon, StarIcon, WalletIcon, ChevronRightIcon } from '../components/icons'
 import { currencyWhole as currency } from '../lib/currency'
@@ -119,15 +120,15 @@ export default function CustomersPage() {
     async function loadData() {
       setLoading(true)
       const [{ data: custs }, { data: appts }, { data: pkgs }, { data: pays }, { data: svcs }] = await Promise.all([
-        supabase
+        fetchAll(() => supabase
           .from('customers')
           .select('id, full_name, phone, contact_phone, email, created_at')
-          .order('full_name'),
-        supabase
+          .order('full_name').order('id')),
+        fetchAll(() => supabase
           .from('appointments')
-          .select('id, customer_id, service_id, status, scheduled_at, package_id, price_override'),
-        supabase.from('service_packages').select('id, customer_id, service_id, total_sessions, session_offset'),
-        supabase.from('payments').select('id, customer_id, amount, appointment_id, package_id, paid_at').is('voided_at', null),
+          .select('id, customer_id, service_id, status, scheduled_at, package_id, price_override').order('id')),
+        fetchAll(() => supabase.from('service_packages').select('id, customer_id, service_id, total_sessions, session_offset').order('id')),
+        fetchAll(() => supabase.from('payments').select('id, customer_id, amount, appointment_id, package_id, paid_at').is('voided_at', null).order('id')),
         supabase.from('services').select('id, price'),
       ])
       setCustomers(custs ?? [])
