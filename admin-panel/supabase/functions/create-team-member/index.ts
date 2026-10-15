@@ -13,7 +13,19 @@ Deno.serve(async (req) => {
   if (!auth.ok) return auth.response
   const { businessId, admin } = auth
 
-  let body: { email?: string; password?: string; full_name?: string; gender?: string; phone?: string }
+  let body: {
+    email?: string
+    password?: string
+    full_name?: string
+    gender?: string
+    phone?: string
+    // Hazir rol: 'user' (varsayilan) ya da 'admin' (Yonetici).
+    role?: string
+    // Ilk giriste kendi sifresini belirlesin.
+    must_change_password?: boolean
+    // Online randevu sayfasinda secilebilsin.
+    online_bookable?: boolean
+  }
   try {
     body = await req.json()
   } catch {
@@ -21,6 +33,7 @@ Deno.serve(async (req) => {
   }
 
   const { email, password, full_name, gender, phone } = body
+  const role = body.role === 'admin' ? 'admin' : 'user'
   if (!email || !password || !full_name || !phone) {
     return json({ error: 'email, password, full_name ve phone zorunlu' }, 400)
   }
@@ -50,15 +63,18 @@ Deno.serve(async (req) => {
     .from('profiles')
     .select('id', { count: 'exact', head: true })
     .eq('business_id', businessId)
-    .eq('role', 'user')
     .eq('is_active', true)
 
   if (countErr) return json({ error: 'Kullanıcı sayısı hesaplanamadı' }, 500)
 
-  if ((count ?? 0) >= business.max_users) {
+  // Limit isletme sahibi disindaki TUM aktif hesaplari sayar — eskiden
+  // sadece 'user' sayiliyordu; yonetici rolu acilabildigi icin ek yonetici
+  // hesaplari da limite dahil (tek yoneticili isletmede sonuc ayni).
+  const usedSeats = Math.max(0, (count ?? 0) - 1)
+  if (usedSeats >= business.max_users) {
     return json(
       {
-        error: `Kullanıcı limiti doldu (${count}/${business.max_users}). Yeni hesap açmak için önce bir hesabı pasife alın.`,
+        error: `Kullanıcı limiti doldu (${usedSeats}/${business.max_users}). Yeni hesap açmak için önce bir hesabı pasife alın.`,
       },
       403,
     )
@@ -82,11 +98,13 @@ Deno.serve(async (req) => {
   const { error: insertErr } = await admin.from('profiles').insert({
     id: created.user.id,
     business_id: businessId,
-    role: 'user',
+    role,
     full_name,
     is_active: true,
     gender: gender ?? null,
     whatsapp_phone: phoneDigits,
+    must_change_password: body.must_change_password === true,
+    online_bookable: body.online_bookable !== false,
   })
 
   if (insertErr) {
@@ -98,7 +116,7 @@ Deno.serve(async (req) => {
   }
 
   return json(
-    { data: { id: created.user.id, email, full_name, role: 'user', gender: gender ?? null, phone: phoneDigits } },
+    { data: { id: created.user.id, email, full_name, role, gender: gender ?? null, phone: phoneDigits } },
     200,
   )
 })

@@ -124,6 +124,7 @@ Deno.serve(async (req) => {
     .eq('business_id', business.id)
     .eq('id', service_id)
     .eq('is_active', true)
+    .eq('online_bookable', true)
     .maybeSingle()
   if (!service) return json({ error: 'Hizmet bulunamadı' }, 404)
 
@@ -134,6 +135,8 @@ Deno.serve(async (req) => {
     .select('id, full_name')
     .eq('business_id', business.id)
     .eq('is_active', true)
+    // Calisan ayarlarindaki 'Online randevuda gorunur' kapaliysa secilemez.
+    .eq('online_bookable', true)
 
   // Bir hizmete hic kimse atanmamissa (bkz. Ekip sayfasi "Verebildigi
   // Hizmetler") o hizmete kimse randevu alamaz — kasitli, fallback yok.
