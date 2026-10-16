@@ -170,7 +170,10 @@ Deno.serve(async (req) => {
             token: d.token,
             notification: { title, body: text },
             data: { route, appointment_id: appt.id, event },
-            android: { priority: 'high', notification: { channel_id: 'randevular', sound: 'default' } },
+            android: {
+              priority: 'high',
+              notification: { channel_id: 'randevular', sound: 'default', icon: 'ic_stat_adapptiv', color: '#FF6A13' },
+            },
             apns: { payload: { aps: { sound: 'default' } } },
           },
         }),
