@@ -37,8 +37,8 @@ Deno.serve(async (req) => {
   if (!email || !password || !full_name || !phone) {
     return json({ error: 'email, password, full_name ve phone zorunlu' }, 400)
   }
-  if (password.length < 6) {
-    return json({ error: 'Şifre en az 6 karakter olmalı' }, 400)
+  if (password.length < 8) {
+    return json({ error: 'Şifre en az 8 karakter olmalı' }, 400)
   }
   const phoneDigits = phone.replace(/\D/g, '')
   if (phoneDigits.length < 10) {

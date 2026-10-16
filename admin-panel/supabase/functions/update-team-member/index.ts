@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   const { id, email, password } = body
   if (!id) return json({ error: 'id zorunlu' }, 400)
   if (!email && !password) return json({ error: 'Güncellenecek e-posta veya şifre girin' }, 400)
-  if (password && password.length < 6) return json({ error: 'Şifre en az 6 karakter olmalı' }, 400)
+  if (password && password.length < 8) return json({ error: 'Şifre en az 8 karakter olmalı' }, 400)
 
   // Hedef calisanin cagiranla AYNI isletmeye ait oldugunu dogrula — baska
   // isletmenin hesabini degistirmeyi engeller.

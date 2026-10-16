@@ -105,9 +105,9 @@ export default function EmployeeCreatePage() {
               type="text"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="en az 6 karakter"
+              placeholder="en az 8 karakter"
               required
-              minLength={6}
+              minLength={8}
             />
           </div>
           <div className="field">

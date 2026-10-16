@@ -92,3 +92,7 @@ verify_jwt = true
 
 [functions.operator-appointments]
 verify_jwt = true
+
+# Randevu trigger'i x-webhook-secret ile cagirir (bkz. 20261016000003).
+[functions.send-push-notification]
+verify_jwt = false

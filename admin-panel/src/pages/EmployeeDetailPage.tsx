@@ -598,7 +598,7 @@ export default function EmployeeDetailPage() {
               type="text"
               value={accountPassword}
               onChange={(e) => setAccountPassword(e.target.value)}
-              placeholder="en az 6 karakter"
+              placeholder="en az 8 karakter"
             />
           </div>
           {accountError && <p className={styles.profileError}>{accountError}</p>}
