@@ -91,7 +91,7 @@ export default function TopluMesajPage() {
         fetchAll(() => supabase.from('appointments').select('customer_id, service_id, status, scheduled_at').order('id')),
         supabase.from('services').select('id, name'),
         supabase.from('customer_groups').select('id, name, description').order('created_at', { ascending: false }),
-        fetchAll(() => supabase.from('customer_group_members').select('group_id, customer_id').order('id')),
+        fetchAll(() => supabase.from('customer_group_members').select('group_id, customer_id').order('group_id').order('customer_id')),
         supabase.from('campaign_message_templates').select('id, title, message').order('created_at', { ascending: false }),
       ])
     setCustomers(custs ?? [])
