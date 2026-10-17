@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { buildExtractionSystemPrompt, extractAppointmentCommand, istanbulDateString } from '../_shared/appointmentExtraction.ts'
+import { consumeDailyQuota } from '../_shared/limits.ts'
 
 const RATE_LIMIT_MAX_PER_HOUR = 30
 
@@ -52,6 +53,11 @@ Deno.serve(async (req) => {
     .gte('created_at', oneHourAgo)
   if ((recentAttempts ?? 0) >= RATE_LIMIT_MAX_PER_HOUR) {
     return json({ error: 'Çok fazla deneme yapıldı, lütfen daha sonra tekrar deneyin.' }, 429)
+  }
+  const { data: profile } = await admin.from('profiles').select('business_id').eq('id', userData.user.id).maybeSingle()
+  if (profile?.business_id) {
+    const quotaBlocked = await consumeDailyQuota(admin, profile.business_id, 'ai_command')
+    if (quotaBlocked) return quotaBlocked
   }
   await admin.from('parse_command_attempts').insert({ user_id: userData.user.id })
 

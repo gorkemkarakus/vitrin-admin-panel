@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
+import { clientKey, rateLimit } from '../_shared/limits.ts'
 import { SLOT_MINUTES, eligibleDayHours, listOpenSlots, istanbulParts } from '../_shared/availability.ts'
 
 // Herkese açık — x-api-key YOK. business_id, URL'de zaten görünür olan
@@ -24,6 +25,11 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceKey)
+
+  // Sayfa her hizmet/gun seciminde bunu cagirir; normal kullanim 10 dakikada
+  // birkac on istegi gecmez. Slug taramasi ve kaba kuvvet icin IP basina sinir.
+  const limited = await rateLimit(admin, 'public-booking-info', await clientKey(req), 120, 600)
+  if (limited) return limited
 
   const { data: business } = await admin.from('businesses').select('*').eq('slug', slug).maybeSingle()
   if (!business) return json({ error: 'İşletme bulunamadı' }, 404)

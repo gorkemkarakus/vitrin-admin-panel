@@ -7,8 +7,18 @@ import { isValidTurkishPhone, validateScheduledAt } from '../_shared/validation.
 const PHONE_RATE_LIMIT_MAX_PER_HOUR = 5
 const IP_RATE_LIMIT_MAX_PER_HOUR = 10
 
-async function verifyTurnstile(token: string | undefined, ip: string | null): Promise<boolean> {
-  const secret = Deno.env.get('TURNSTILE_SECRET_KEY')
+async function verifyTurnstile(
+  admin: ReturnType<typeof createClient>,
+  token: string | undefined,
+  ip: string | null,
+): Promise<boolean> {
+  // Function secret'i yoksa _app_secrets tablosuna bakilir (CLI ile secret
+  // ayarlanamadigi durumlar icin; bkz. resolveBusiness.ts).
+  let secret = Deno.env.get('TURNSTILE_SECRET_KEY')
+  if (!secret) {
+    const { data } = await admin.from('_app_secrets').select('value').eq('name', 'turnstile_secret_key').maybeSingle()
+    secret = (data?.value as string | undefined) || undefined
+  }
   if (!secret) return true // Turnstile henüz kurulmadıysa doğrulamayı atla (geçici).
   if (!token) return false
   const form = new FormData()
@@ -66,14 +76,14 @@ Deno.serve(async (req) => {
 
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
 
-  const turnstileOk = await verifyTurnstile(turnstile_token, clientIp)
-  if (!turnstileOk) {
-    return json({ error: 'Doğrulama başarısız, lütfen sayfayı yenileyip tekrar deneyin.' }, 400)
-  }
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceKey)
+
+  const turnstileOk = await verifyTurnstile(admin, turnstile_token, clientIp)
+  if (!turnstileOk) {
+    return json({ error: 'Doğrulama başarısız, lütfen sayfayı yenileyip tekrar deneyin.' }, 400)
+  }
 
   const { data: business } = await admin.from('businesses').select('*').eq('slug', slug).maybeSingle()
   if (!business) return json({ error: 'İşletme bulunamadı' }, 404)

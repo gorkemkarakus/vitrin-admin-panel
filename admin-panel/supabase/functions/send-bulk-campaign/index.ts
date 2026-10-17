@@ -1,6 +1,7 @@
 import { corsHeaders, json } from '../_shared/http.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { sendCustomerMessage } from '../_shared/notify.ts'
+import { consumeDailyQuota } from '../_shared/limits.ts'
 
 const MAX_RECIPIENTS = 500
 const RATE_LIMIT_MAX_PER_HOUR = 10
@@ -36,6 +37,10 @@ Deno.serve(async (req) => {
   if (customerIds.length === 0) return json({ error: 'Alıcı listesi boş' }, 400)
   if (customerIds.length > MAX_RECIPIENTS) return json({ error: `En fazla ${MAX_RECIPIENTS} alıcıya tek seferde gönderilebilir` }, 400)
   if (!message) return json({ error: 'Mesaj metni boş olamaz' }, 400)
+
+  // Gunluk toplam alici kotasi (tek seferlik MAX_RECIPIENTS'tan ayri).
+  const quotaBlocked = await consumeDailyQuota(admin, businessId, 'bulk_recipients', customerIds.length)
+  if (quotaBlocked) return quotaBlocked
 
   const { data: business } = await admin
     .from('businesses')

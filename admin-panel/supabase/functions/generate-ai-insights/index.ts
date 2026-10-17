@@ -1,6 +1,7 @@
 import { corsHeaders, json } from '../_shared/http.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { generateBusinessInsights } from '../_shared/aiInsights.ts'
+import { consumeDailyQuota } from '../_shared/limits.ts'
 
 const COOLDOWN_MS = 10 * 60 * 1000 // 10 dakika — yanlışlıkla çift tıklamaya karşı, yeni tablo gerekmiyor
 const WINDOW_DAYS = 30
@@ -64,6 +65,9 @@ Deno.serve(async (req) => {
     console.error('generate-ai-insights: OPENAI_API_KEY eksik')
     return json({ error: 'Sunucu yapılandırması eksik' }, 500)
   }
+
+  const quotaBlocked = await consumeDailyQuota(admin, businessId, 'ai_insights')
+  if (quotaBlocked) return quotaBlocked
 
   const now = new Date()
   const windowStart = customStart ? new Date(`${customStart}T00:00:00Z`) : new Date(now.getTime() - WINDOW_DAYS * 86400000)

@@ -1,5 +1,6 @@
 import { corsHeaders, json } from '../_shared/http.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
+import { consumeDailyQuota } from '../_shared/limits.ts'
 
 // Diger OpenAI cagrilarimizla (appointmentExtraction.ts, aiInsights.ts) AYNI
 // desen: raw fetch, model gpt-5-mini, yapilandirilmis cikti icin tool-forcing.
@@ -61,6 +62,8 @@ Deno.serve(async (req) => {
   if ((recentAttempts ?? 0) >= RATE_LIMIT_MAX_PER_HOUR) {
     return json({ error: 'Çok fazla deneme yapıldı, lütfen daha sonra tekrar deneyin.' }, 429)
   }
+  const quotaBlocked = await consumeDailyQuota(admin, businessId, 'ai_campaign_message')
+  if (quotaBlocked) return quotaBlocked
   await admin.from('campaign_message_attempts').insert({ business_id: businessId })
 
   // AI'in olmayan hizmet ismi uydurmasini (ör. "saç kesimi, renklendirme")
