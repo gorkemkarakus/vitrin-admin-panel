@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { corsHeaders, json } from '../_shared/http.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
+import { isOptOutMessage } from '../_shared/marketing.ts'
 import { sendWhatsAppText } from '../_shared/notify.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
@@ -165,15 +166,27 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   const customerName = value?.contacts?.[0]?.profile?.name ?? null
   const text = message.text?.body ?? ''
 
+  // Loglarda kisisel veri yok: telefon, isim ve mesaj metni yazilmaz.
   console.log('whatsapp-webhook: parse edildi', {
     business_id: business.id,
-    business_name: business.name,
     phone_number_id: phoneNumberId,
-    from: message.from,
     wamid,
-    text,
-    customer_name: customerName,
+    text_length: text.length,
   })
+
+  // "RET": kampanya izni kapatilir, asistana iletilmez.
+  if (isOptOutMessage(text)) {
+    const { error: optErr } = await admin.rpc('opt_out_customer_by_phone', { p_business: business.id, p_phone: message.from })
+    if (optErr) console.error('whatsapp-webhook: ret kaydedilemedi:', optErr.message)
+    if (phoneNumberId) {
+      await sendWhatsAppText({
+        phoneNumberId,
+        to: message.from,
+        message: 'Kampanya mesajı listesinden çıkarıldınız. Randevu hatırlatmalarınız gelmeye devam edecek.',
+      })
+    }
+    return
+  }
 
   await forwardToN8n({
     business_id: business.id,

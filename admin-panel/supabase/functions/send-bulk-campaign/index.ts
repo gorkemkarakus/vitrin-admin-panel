@@ -2,6 +2,7 @@ import { corsHeaders, json } from '../_shared/http.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { sendCustomerMessage } from '../_shared/notify.ts'
 import { consumeDailyQuota } from '../_shared/limits.ts'
+import { withOptOutFooter } from '../_shared/marketing.ts'
 
 const MAX_RECIPIENTS = 500
 const RATE_LIMIT_MAX_PER_HOUR = 10
@@ -38,10 +39,6 @@ Deno.serve(async (req) => {
   if (customerIds.length > MAX_RECIPIENTS) return json({ error: `En fazla ${MAX_RECIPIENTS} alıcıya tek seferde gönderilebilir` }, 400)
   if (!message) return json({ error: 'Mesaj metni boş olamaz' }, 400)
 
-  // Gunluk toplam alici kotasi (tek seferlik MAX_RECIPIENTS'tan ayri).
-  const quotaBlocked = await consumeDailyQuota(admin, businessId, 'bulk_recipients', customerIds.length)
-  if (quotaBlocked) return quotaBlocked
-
   const { data: business } = await admin
     .from('businesses')
     .select('whatsapp_phone_number_id')
@@ -56,10 +53,18 @@ Deno.serve(async (req) => {
     .select('id, phone, contact_phone')
     .eq('business_id', businessId)
     .in('id', customerIds)
+    // Yalnizca ticari ileti izni olanlar (6563 sayili Kanun).
+    .eq('marketing_consent', true)
 
   if (custErr) {
     console.error('send-bulk-campaign: müşteri sorgusu hatası:', custErr.message)
     return json({ error: 'Alıcılar okunamadı' }, 500)
+  }
+
+  // Gunluk toplam alici kotasi (tek seferlik MAX_RECIPIENTS'tan ayri).
+  if ((customers?.length ?? 0) > 0) {
+    const quotaBlocked = await consumeDailyQuota(admin, businessId, 'bulk_recipients', customers!.length)
+    if (quotaBlocked) return quotaBlocked
   }
 
   let sent = 0
@@ -72,11 +77,12 @@ Deno.serve(async (req) => {
       phone,
       phoneNumberId: business?.whatsapp_phone_number_id ?? null,
       kind: 'bulk_campaign',
-      message,
+      message: withOptOutFooter(message),
     })
     if (result.ok) sent += 1
     else failed += 1
   }
 
-  return json({ data: { sent, failed, total: customers?.length ?? 0 } }, 200)
+  const total = customers?.length ?? 0
+  return json({ data: { sent, failed, total, skipped_no_consent: customerIds.length - total } }, 200)
 })

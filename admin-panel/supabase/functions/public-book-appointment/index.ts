@@ -26,6 +26,8 @@ Deno.serve(async (req) => {
     customer_name?: string
     customer_phone?: string
     turnstile_token?: string
+    // Musterinin formda kendisi isaretledigi, varsayilan KAPALI kampanya izni.
+    marketing_consent?: boolean
   }
   try {
     body = await req.json()
@@ -34,6 +36,7 @@ Deno.serve(async (req) => {
   }
 
   const { slug, service_id, employee_id, scheduled_at, customer_name, customer_phone, turnstile_token } = body
+  const marketingConsent = body.marketing_consent === true
 
   if (!slug || !service_id || !scheduled_at || !customer_name || !customer_phone) {
     return json(
@@ -188,13 +191,19 @@ Deno.serve(async (req) => {
           full_name: customer_name,
           phone: customer_phone,
           contact_phone: customer_phone,
+          ...(marketingConsent ? { marketing_consent: true, marketing_consent_source: 'online_booking' } : {}),
         })
         .select('id')
         .single()
       if (custErr || !newCustomer) throw new Error(custErr?.message ?? 'Müşteri oluşturulamadı')
       customerId = newCustomer.id
     } else {
-      const updates: Record<string, string> = {}
+      const updates: Record<string, string | boolean> = {}
+      // Izin yalnizca verilebilir; isaretlenmemis kutu mevcut izni geri almaz.
+      if (marketingConsent) {
+        updates.marketing_consent = true
+        updates.marketing_consent_source = 'online_booking'
+      }
       if (!existingCustomer.contact_phone) updates.contact_phone = customer_phone
       if (!existingCustomer.full_name || existingCustomer.full_name === 'Müşteri') {
         updates.full_name = customer_name
