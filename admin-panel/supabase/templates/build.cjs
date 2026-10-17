@@ -10,7 +10,7 @@ const FONT = "'Segoe UI', Helvetica, Arial, sans-serif"
 function steps(items) {
   return `
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 4px;background:#f5f6f8;border-radius:16px;">
-                  <tr><td style="padding:18px 20px 6px;font-family:${FONT};font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">Doğruladıktan sonra</td></tr>
+                  <tr><td style="padding:18px 20px 6px;font-family:${FONT};font-size:14px;font-weight:700;color:#111827;">Doğruladıktan sonra</td></tr>
 ${items
   .map(
     (t, i) => `                  <tr>
@@ -33,7 +33,7 @@ ${items
 function codeBox(label) {
   return `
                       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f8;border-radius:16px;">
-                        <tr><td align="center" style="padding:18px 16px 4px;font-family:${FONT};font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">${label}</td></tr>
+                        <tr><td align="center" style="padding:18px 16px 2px;font-family:${FONT};font-size:13px;color:#6b7280;">${label}</td></tr>
                         <tr><td align="center" style="padding:4px 16px 20px;font-family:'Courier New', Consolas, monospace;font-size:34px;line-height:1.2;font-weight:700;letter-spacing:10px;color:${NAVY};">{{ .Token }}</td></tr>
                       </table>
                       <p style="margin:14px 0 0;font-family:${FONT};font-size:13px;line-height:1.6;color:#6b7280;">Kod 1 saat geçerlidir. Kimseyle paylaşmayın; Adapptiv sizden bu kodu asla telefonla istemez.</p>`
@@ -54,7 +54,7 @@ function linkButton(button) {
                       </p>`
 }
 
-function layout({ dashboard, subject, preheader, eyebrow, title, body, button, code, extra = '', footnote }) {
+function layout({ dashboard, subject, preheader, title, body, button, code, extra = '', footnote }) {
   return `<!--
   Supabase Dashboard > Authentication > Emails > Templates > "${dashboard}"
   Konu: ${subject}
@@ -86,8 +86,7 @@ function layout({ dashboard, subject, preheader, eyebrow, title, body, button, c
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="padding:32px 32px 34px;">
-                      <span style="display:inline-block;background:#fff4ec;color:#b4470a;font-family:${FONT};font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;border-radius:999px;">${eyebrow}</span>
-                      <h1 style="margin:18px 0 12px;font-family:${FONT};font-size:26px;line-height:1.25;font-weight:700;color:#111827;">${title}</h1>
+                      <h1 style="margin:0 0 12px;font-family:${FONT};font-size:26px;line-height:1.25;font-weight:700;color:#111827;">${title}</h1>
                       <p style="margin:0 0 28px;font-family:${FONT};font-size:15px;line-height:1.65;color:#4b5563;">${body}</p>${code ? codeBox(code) : linkButton(button)}${extra}
                     </td>
                   </tr>
@@ -114,7 +113,6 @@ const files = {
     dashboard: 'Confirm signup',
     subject: 'Adapptiv doğrulama kodunuz: {{ .Token }}',
     preheader: 'Kodu uygulamaya yazın, salonunuz hazır.',
-    eyebrow: 'Hesap doğrulama',
     title: 'Salonunuz neredeyse hazır',
     body: 'Adapptiv’e hoş geldiniz. Aşağıdaki kodu uygulamadaki “E-postanı kontrol et” ekranına yazın; hesabınız doğrulanır ve giriş yaparsınız.',
     code: 'Doğrulama kodunuz',
@@ -129,7 +127,6 @@ const files = {
     dashboard: 'Reset password',
     subject: 'Adapptiv şifre sıfırlama kodunuz: {{ .Token }}',
     preheader: 'Kodu uygulamaya yazıp yeni şifrenizi belirleyin.',
-    eyebrow: 'Şifre sıfırlama',
     title: 'Yeni şifrenizi belirleyin',
     body: 'Adapptiv hesabınız için şifre sıfırlama istendi. Aşağıdaki kodu uygulamadaki “Şifremi unuttum” ekranına yazıp yeni şifrenizi belirleyin.',
     code: 'Sıfırlama kodunuz',
@@ -139,7 +136,6 @@ const files = {
     dashboard: 'Change email address',
     subject: 'Adapptiv e-posta adresi değişikliği',
     preheader: 'Hesabınızın e-posta adresini değiştirmeyi onaylayın.',
-    eyebrow: 'E-posta değişikliği',
     title: 'Yeni adresinizi onaylayın',
     body: 'Adapptiv hesabınızın e-posta adresi <b style="color:#111827;">{{ .Email }}</b> yerine <b style="color:#111827;">{{ .NewEmail }}</b> olarak değiştirilmek isteniyor.',
     button: 'Değişikliği onayla',
