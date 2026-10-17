@@ -25,7 +25,7 @@
         "url": "https://rllvmyriopaulcmmynbe.supabase.co/functions/v1/staff-whatsapp-webhook",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ phone: $('Webhook').item.json.body.from, message: $('Webhook').item.json.body.message }) }}",
+        "jsonBody": "={{ JSON.stringify({ phone: $('Webhook').item.json.body.from, message: $('Webhook').item.json.body.message, phone_number_id: $('Webhook').item.json.body.phone_number_id }) }}",
         "options": {
           "timeout": 15000
         },
@@ -52,8 +52,8 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
-          "name": "Vitrin Business API Key"
+          "id": "e6f7a8b9-0000-0000-0000-00000000cae5",
+          "name": "Vitrin Bot Secret"
         }
       }
     },
@@ -123,8 +123,8 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
-          "name": "Vitrin Business API Key"
+          "id": "e6f7a8b9-0000-0000-0000-00000000cae5",
+          "name": "Vitrin Bot Secret"
         }
       }
     },
@@ -139,7 +139,7 @@
           "conditions": [
             {
               "id": "cond-paused",
-              "leftValue": "={{ $json.bot_paused }}",
+              "leftValue": "={{ $json.bot_paused === true || !$json.business_name }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -163,7 +163,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Personel WhatsApp Coexistence uzerinden telefon uygulamasindan elle\n// devraldiginda bot bu numaraya HIC cevap uretmez (ust uste binen/celisen\n// mesaj riski) — sessizce bos bir cevap doner, chatbot_messages'a da\n// yazilmaz (o an olanlar zaten WhatsApp'in kendi Coexistence senkronuyla\n// telefon uygulamasinda goruluyor).\nreturn [{ json: { reply: '' } }]"
+        "jsCode": "// Iki durumda bot HIC cevap uretmez, sessizce bos cevap doner:\n// 1) Personel WhatsApp Coexistence uzerinden elle devraldiginda (bot_paused).\n// 2) Mesajin geldigi numara hicbir isletmeye bagli degilse (baglam alinamadi).\nreturn [{ json: { reply: '' } }]"
       },
       "id": "n16-paused-reply",
       "name": "Build Paused Reply",
@@ -313,8 +313,8 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
-          "name": "Vitrin Business API Key"
+          "id": "e6f7a8b9-0000-0000-0000-00000000cae5",
+          "name": "Vitrin Bot Secret"
         }
       }
     },
@@ -380,8 +380,8 @@
       "waitBetweenTries": 2000,
       "credentials": {
         "httpHeaderAuth": {
-          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
-          "name": "Vitrin Business API Key"
+          "id": "e6f7a8b9-0000-0000-0000-00000000cae5",
+          "name": "Vitrin Bot Secret"
         }
       }
     },
@@ -528,8 +528,8 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
-          "name": "Vitrin Business API Key"
+          "id": "e6f7a8b9-0000-0000-0000-00000000cae5",
+          "name": "Vitrin Bot Secret"
         }
       }
     },
@@ -597,8 +597,8 @@
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
-          "name": "Vitrin Business API Key"
+          "id": "e6f7a8b9-0000-0000-0000-00000000cae5",
+          "name": "Vitrin Bot Secret"
         }
       }
     },

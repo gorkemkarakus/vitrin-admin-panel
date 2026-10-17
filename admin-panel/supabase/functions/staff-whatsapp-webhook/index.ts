@@ -69,6 +69,9 @@ function matchesIntent(message: string, words: string[]): boolean {
 interface RequestBody {
   phone?: string
   message?: string
+  // Mesajin geldigi isletme WhatsApp numarasinin Meta kimligi: x-bot-secret
+  // ile birlikte gelirse isletme bundan bulunur (cok salonlu kullanim).
+  phone_number_id?: string
 }
 
 function normalizePhone(raw: string): string {
@@ -141,7 +144,7 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceKey)
 
-  const business = await resolveBusiness(admin, req)
+  const business = await resolveBusiness(admin, req, body.phone_number_id)
   if (!business) return json({ error: 'Geçersiz API anahtarı' }, 401)
 
   const { data: staff } = await admin
