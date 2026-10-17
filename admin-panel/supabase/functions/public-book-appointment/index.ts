@@ -3,35 +3,10 @@ import { corsHeaders, json } from '../_shared/http.ts'
 import { sha256Hex } from '../_shared/crypto.ts'
 import { SLOT_MINUTES, isAvailable, rankEligibleByFairness } from '../_shared/availability.ts'
 import { isValidTurkishPhone, validateScheduledAt } from '../_shared/validation.ts'
+import { verifyTurnstile } from '../_shared/turnstile.ts'
 
 const PHONE_RATE_LIMIT_MAX_PER_HOUR = 5
 const IP_RATE_LIMIT_MAX_PER_HOUR = 10
-
-async function verifyTurnstile(
-  admin: ReturnType<typeof createClient>,
-  token: string | undefined,
-  ip: string | null,
-): Promise<boolean> {
-  // Function secret'i yoksa _app_secrets tablosuna bakilir (CLI ile secret
-  // ayarlanamadigi durumlar icin; bkz. resolveBusiness.ts).
-  let secret = Deno.env.get('TURNSTILE_SECRET_KEY')
-  if (!secret) {
-    const { data } = await admin.from('_app_secrets').select('value').eq('name', 'turnstile_secret_key').maybeSingle()
-    secret = (data?.value as string | undefined) || undefined
-  }
-  if (!secret) return true // Turnstile henüz kurulmadıysa doğrulamayı atla (geçici).
-  if (!token) return false
-  const form = new FormData()
-  form.append('secret', secret)
-  form.append('response', token)
-  if (ip) form.append('remoteip', ip)
-  const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-    method: 'POST',
-    body: form,
-  })
-  const outcome = await res.json()
-  return outcome.success === true
-}
 
 // Herkese açık yazma uç noktası — x-api-key YOK, internetten doğrudan POST
 // edilebilir. book-appointment'ın aksine aradan n8n/LLM süzgeci geçmediği

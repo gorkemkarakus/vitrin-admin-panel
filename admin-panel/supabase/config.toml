@@ -22,6 +22,9 @@ verify_jwt = false
 [functions.public-booking-info]
 verify_jwt = false
 
+[functions.account-deletion-request]
+verify_jwt = false
+
 [functions.staff-whatsapp-webhook]
 verify_jwt = false
 
