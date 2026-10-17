@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { requireFeature } from '../_shared/plan.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { decryptToken } from '../_shared/crypto.ts'
 import { listAdAccounts } from '../_shared/metaAds.ts'
@@ -12,6 +13,8 @@ Deno.serve(async (req) => {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
   const { userId, businessId, admin } = auth
+  const planBlocked = await requireFeature(admin, businessId, 'ads')
+  if (planBlocked) return planBlocked
 
   let body: { ad_account_id?: string }
   try {

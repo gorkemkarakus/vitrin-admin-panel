@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { planHas } from '../_shared/plan.ts'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
 import { SLOT_MINUTES, isAvailable, rankEligibleByFairness } from '../_shared/availability.ts'
@@ -146,6 +147,9 @@ Deno.serve(async (req) => {
 
   const business = await resolveBusiness(admin, req, body.phone_number_id)
   if (!business) return json({ error: 'Geçersiz API anahtarı' }, 401)
+  if (!(await planHas(admin, business.id, 'staff_whatsapp'))) {
+    return json({ handled: false, reply: 'Bu özellik işletmenin paketinde yok.' }, 200)
+  }
 
   const { data: staff } = await admin
     .from('profiles')

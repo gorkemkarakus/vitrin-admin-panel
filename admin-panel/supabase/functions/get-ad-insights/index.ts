@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { requireFeature } from '../_shared/plan.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { decryptToken } from '../_shared/crypto.ts'
 import { fetchAdInsights } from '../_shared/metaAds.ts'
@@ -23,6 +24,8 @@ Deno.serve(async (req) => {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
   const { businessId, admin } = auth
+  const planBlocked = await requireFeature(admin, businessId, 'ads')
+  if (planBlocked) return planBlocked
 
   let body: { range_days?: number }
   try {

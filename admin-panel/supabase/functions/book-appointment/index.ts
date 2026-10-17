@@ -367,6 +367,9 @@ Deno.serve(async (req) => {
       // Ham Postgres hatasi n8n uzerinden dogrudan musteriye WhatsApp/
       // Instagram mesaji olarak gidiyordu (Build Reply From Booking, ham
       // errMsg'i sorgusuzca gosteriyor) — artik burada temizleniyor.
+      if (/PLAN_LIMIT/.test(msg)) {
+        return json({ error: 'Şu an online randevu alınamıyor, lütfen salonu arayın.' }, 403)
+      }
       console.error('book-appointment insert error:', msg)
       return json({ error: 'Randevu oluşturulamadı, lütfen tekrar deneyin.' }, 500)
     }

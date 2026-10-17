@@ -3,16 +3,18 @@ import { sha256Hex } from './crypto.ts'
 import { json } from './http.ts'
 
 // Maliyet doguran islemler icin isletme basi GUNLUK kotalar (Europe/Istanbul
-// gunu). Kisa sureli tekrar sinirlari fonksiyonlarin kendi deneme
-// tablolarinda; bunlar toplam harcamayi sinirlar.
-export const DAILY_QUOTAS = {
-  ai_campaign_message: 30, // AI ile kampanya metni yazdirma
-  ai_insights: 10, // AI isletme analizi
-  ai_command: 100, // dogal dille randevu komutu
-  bulk_recipients: 500, // toplu mesajda gunluk toplam alici
+// gunu). Sinir degerleri isletmenin PAKETINDEN gelir (plan_definitions.limits);
+// paket okunamazsa asagidaki yedek degerler kullanilir.
+const QUOTA_PLAN_KEY = {
+  ai_campaign_message: 'ai_campaign_per_day', // AI ile kampanya metni yazdirma
+  ai_insights: 'ai_insights_per_day', // AI isletme analizi
+  ai_command: 'ai_command_per_day', // dogal dille randevu komutu
+  bulk_recipients: 'bulk_recipients_per_day', // toplu mesajda gunluk toplam alici
 } as const
 
-export type QuotaKind = keyof typeof DAILY_QUOTAS
+const FALLBACK_QUOTAS = { ai_campaign_message: 30, ai_insights: 10, ai_command: 100, bulk_recipients: 500 }
+
+export type QuotaKind = keyof typeof QUOTA_PLAN_KEY
 
 // Kota yeterliyse ayirir ve null doner; yetmiyorsa 429 yaniti doner.
 // Veritabani fonksiyonu yoksa/hata verirse islem engellenmez (kota bir
@@ -23,10 +25,21 @@ export async function consumeDailyQuota(
   kind: QuotaKind,
   amount = 1,
 ): Promise<Response | null> {
+  const { data: planValue, error: planErr } = await admin.rpc('plan_limit', {
+    p_business: businessId,
+    p_key: QUOTA_PLAN_KEY[kind],
+  })
+  if (planErr) console.error('plan_limit hatasi:', planErr.message)
+  // null = sinirsiz (paket boyle tanimliysa)
+  if (!planErr && planValue === null) return null
+  const limit = typeof planValue === 'number' ? planValue : FALLBACK_QUOTAS[kind]
+  if (limit <= 0) {
+    return json({ error: 'Bu özellik paketinizde yok.', code: 'PLAN_FEATURE' }, 403)
+  }
   const { data, error } = await admin.rpc('consume_quota', {
     p_business: businessId,
     p_kind: kind,
-    p_limit: DAILY_QUOTAS[kind],
+    p_limit: limit,
     p_amount: amount,
   })
   if (error) {
@@ -35,7 +48,7 @@ export async function consumeDailyQuota(
   }
   if (data === true) return null
   return json(
-    { error: `Bugünkü kullanım sınırına ulaşıldı (günde ${DAILY_QUOTAS[kind]}). Yarın tekrar deneyebilirsin.` },
+    { error: `Bugünkü kullanım sınırına ulaşıldı (günde ${limit}). Yarın tekrar deneyebilirsin.`, code: 'QUOTA' },
     429,
   )
 }

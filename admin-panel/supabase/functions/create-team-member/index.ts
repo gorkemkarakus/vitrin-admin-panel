@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { planLimit, planLimitResponse, requireFeature } from '../_shared/plan.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 
 Deno.serve(async (req) => {
@@ -51,13 +52,12 @@ Deno.serve(async (req) => {
     return json({ error: "gender 'kadin' veya 'erkek' olmalı" }, 400)
   }
 
-  const { data: business, error: bizErr } = await admin
-    .from('businesses')
-    .select('max_users')
-    .eq('id', businessId)
-    .maybeSingle()
-
-  if (bizErr || !business) return json({ error: 'İşletme bulunamadı' }, 404)
+  // Paket: calisan ekleme ozelligi ve toplam kullanici siniri (sahip dahil).
+  // Veritabani tetikleyicisi de ayni siniri uygular; burada kullaniciya
+  // anlasilir mesaj icin once kontrol edilir.
+  const planBlocked = await requireFeature(admin, businessId, 'staff')
+  if (planBlocked) return planBlocked
+  const maxUsers = await planLimit(admin, businessId, 'max_users')
 
   const { count, error: countErr } = await admin
     .from('profiles')
@@ -67,14 +67,15 @@ Deno.serve(async (req) => {
 
   if (countErr) return json({ error: 'Kullanıcı sayısı hesaplanamadı' }, 500)
 
-  // Limit isletme sahibi disindaki TUM aktif hesaplari sayar — eskiden
-  // sadece 'user' sayiliyordu; yonetici rolu acilabildigi icin ek yonetici
-  // hesaplari da limite dahil (tek yoneticili isletmede sonuc ayni).
-  const usedSeats = Math.max(0, (count ?? 0) - 1)
-  if (usedSeats >= business.max_users) {
+  // Sinir isletme sahibi DAHIL tum aktif hesaplari sayar (paketteki
+  // "kullanici" sayisi). null = sinirsiz.
+  const usedSeats = count ?? 0
+  if (maxUsers !== null && usedSeats >= maxUsers) {
     return json(
       {
-        error: `Kullanıcı limiti doldu (${usedSeats}/${business.max_users}). Yeni hesap açmak için önce bir hesabı pasife alın.`,
+        error: `Paketinizdeki kullanıcı sınırı doldu (${usedSeats}/${maxUsers}). Paketinizi yükseltebilir ya da bir hesabı pasife alabilirsiniz.`,
+        code: 'PLAN_LIMIT',
+        limit: 'max_users',
       },
       403,
     )
@@ -111,6 +112,11 @@ Deno.serve(async (req) => {
     // Profil eklenemediyse yetim auth kullanıcısı kalmasın
     console.error('create-team-member profile insert error:', insertErr.message)
     await admin.auth.admin.deleteUser(created.user.id)
+    const planErr = planLimitResponse(insertErr)
+    if (planErr) {
+      await admin.auth.admin.deleteUser(created.user.id)
+      return planErr
+    }
     const isDupPhone = insertErr.code === '23505' && insertErr.message.includes('whatsapp_phone')
     return json({ error: isDupPhone ? 'Bu telefon numarası başka bir çalışana kayıtlı' : 'Profil oluşturulamadı' }, 500)
   }

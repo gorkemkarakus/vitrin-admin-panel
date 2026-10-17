@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { planHas } from '../_shared/plan.ts'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { clientKey, rateLimit } from '../_shared/limits.ts'
 import { SLOT_MINUTES, eligibleDayHours, listOpenSlots, istanbulParts } from '../_shared/availability.ts'
@@ -52,6 +53,7 @@ Deno.serve(async (req) => {
   const response: Record<string, unknown> = {
     business: { name: business.name },
     services: services ?? [],
+    branded: !(await planHas(admin, business.id, 'unbranded_booking')),
   }
 
   if (!service_id) return json(response, 200)

@@ -246,6 +246,9 @@ Deno.serve(async (req) => {
     if (/exclusion|duplicate key|deadlock|mesaide değil/i.test(msg)) {
       return json({ status: 'conflict' }, 200)
     }
+    if (/PLAN_LIMIT/.test(msg)) {
+      return json({ error: 'Bu salon şu an online randevu alamıyor. Lütfen salonla iletişime geçin.', closed: true }, 403)
+    }
     // Ham Postgres hatasi kimlik dogrulamasi olmayan bir internet
     // kullanicisina hic sizmasin — teshis icin sunucu logunda kalir.
     console.error('public-book-appointment insert error:', msg)

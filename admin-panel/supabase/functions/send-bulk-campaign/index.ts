@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { requireFeature } from '../_shared/plan.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { sendCustomerMessage } from '../_shared/notify.ts'
 import { consumeDailyQuota } from '../_shared/limits.ts'
@@ -14,6 +15,8 @@ Deno.serve(async (req) => {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
   const { businessId, admin } = auth
+  const planBlocked = await requireFeature(admin, businessId, 'bulk_campaign')
+  if (planBlocked) return planBlocked
 
   // Her tetikleme artik gercek bir WhatsApp mesaji anlamina geliyor
   // (_shared/notify.ts) — calinmis/kotuye kullanilan bir admin oturumu

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { planHas } from '../_shared/plan.ts'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
 
@@ -26,6 +27,11 @@ Deno.serve(async (req) => {
 
   const business = await resolveBusiness(admin, req, body.phone_number_id)
   if (!business) return json({ error: 'Geçersiz API anahtarı' }, 401)
+
+  // Paket WhatsApp asistanini kapsamiyorsa bot cevap uretmez (OpenAI cagrilmaz).
+  if (!(await planHas(admin, business.id, 'whatsapp_bot'))) {
+    return json({ business_name: business.name, bot_paused: true, plan_blocked: true }, 200)
+  }
 
   const { customer_phone } = body
   if (!customer_phone) return json({ error: 'customer_phone zorunlu' }, 400)

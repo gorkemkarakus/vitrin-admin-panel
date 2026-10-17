@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { requireFeature } from '../_shared/plan.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { encryptToken } from '../_shared/crypto.ts'
 import { exchangeCodeForToken, exchangeForLongLivedToken, listAdAccounts } from '../_shared/metaAds.ts'
@@ -15,6 +16,8 @@ Deno.serve(async (req) => {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
   const { businessId, admin } = auth
+  const planBlocked = await requireFeature(admin, businessId, 'ads')
+  if (planBlocked) return planBlocked
 
   let body: { code?: string; redirect_uri?: string }
   try {

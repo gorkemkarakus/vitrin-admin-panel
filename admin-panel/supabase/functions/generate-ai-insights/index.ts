@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { requireFeature } from '../_shared/plan.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 import { generateBusinessInsights } from '../_shared/aiInsights.ts'
 import { consumeDailyQuota } from '../_shared/limits.ts'
@@ -37,6 +38,8 @@ Deno.serve(async (req) => {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
   const { businessId, admin } = auth
+  const planBlocked = await requireFeature(admin, businessId, 'ai_insights')
+  if (planBlocked) return planBlocked
 
   // Frontend'deki tarih aralığı seçiciden (AiInsightsPage.tsx) opsiyonel
   // rangeStart/rangeEnd/periodLabel/periodKey gelebilir — gelmezse eski sabit
