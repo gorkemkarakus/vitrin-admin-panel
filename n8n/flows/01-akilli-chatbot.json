@@ -28,6 +28,17 @@
         "jsonBody": "={{ JSON.stringify({ phone: $('Webhook').item.json.body.from, message: $('Webhook').item.json.body.message }) }}",
         "options": {
           "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_CqpxvhHpayp_4Ad45ZZYHw_ti3Vo9ak"
+            }
+          ]
         }
       },
       "id": "n13-check-staff",
@@ -38,7 +49,13 @@
         420,
         560
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "a1b2c3d4-0000-0000-0000-00000000cae1",
+          "name": "Vitrin Business API Key"
+        }
+      }
     },
     {
       "parameters": {
