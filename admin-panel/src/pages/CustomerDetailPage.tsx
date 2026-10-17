@@ -9,6 +9,7 @@ import Select from '../components/Select'
 import { ChevronRightIcon, PhoneIcon, MailIcon, WalletIcon, PencilIcon, TrashIcon, ClockIcon, ServicesIcon, TrendingUpIcon, CalendarIcon } from '../components/icons'
 import { toLocalDateString } from '../lib/date'
 import styles from './CustomerDetailPage.module.css'
+import { CONSENT_SOURCE_LABEL } from '../lib/marketing'
 
 interface Customer {
   id: string
@@ -17,6 +18,9 @@ interface Customer {
   contact_phone: string | null
   email: string | null
   created_at: string
+  marketing_consent: boolean
+  marketing_consent_at: string | null
+  marketing_consent_source: string | null
 }
 
 interface Service {
@@ -132,6 +136,7 @@ export default function CustomerDetailPage() {
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [editEmail, setEditEmail] = useState('')
+  const [editConsent, setEditConsent] = useState(false)
   const [editCustomerSubmitting, setEditCustomerSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -141,7 +146,7 @@ export default function CustomerDetailPage() {
     const [{ data: cust }, { data: appts }, { data: pkgs }, { data: pays }, { data: svcs }, { data: emps }] = await Promise.all([
       supabase
         .from('customers')
-        .select('id, full_name, phone, contact_phone, email, created_at')
+        .select('id, full_name, phone, contact_phone, email, created_at, marketing_consent, marketing_consent_at, marketing_consent_source')
         .eq('id', id)
         .maybeSingle(),
       supabase
@@ -414,6 +419,7 @@ export default function CustomerDetailPage() {
     setEditName(customer.full_name)
     setEditPhone(customerPhone(customer) ?? '')
     setEditEmail(customer.email ?? '')
+    setEditConsent(customer.marketing_consent)
     setEditCustomerOpen(true)
   }
 
@@ -429,6 +435,9 @@ export default function CustomerDetailPage() {
           full_name: formatPersonName(editName),
           contact_phone: editPhone.trim() || null,
           email: editEmail.trim() || null,
+          // Ticari ileti izni (6563): tarih/kaynak damgasini sunucu atar.
+          marketing_consent: editConsent,
+          ...(editConsent && !customer?.marketing_consent ? { marketing_consent_source: 'manual' } : {}),
         })
         .eq('id', id)
       if (updateErr) {
@@ -787,6 +796,17 @@ export default function CustomerDetailPage() {
                   placeholder="ornek@eposta.com"
                 />
               </div>
+              <label className={styles.consentRow}>
+                <input type="checkbox" checked={editConsent} onChange={(e) => setEditConsent(e.target.checked)} />
+                <span>
+                  <strong>Kampanya mesajı izni var</strong>
+                  <small>
+                    {customer?.marketing_consent && customer.marketing_consent_at && editConsent
+                      ? `${new Date(customer.marketing_consent_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Istanbul' })} tarihinde ${CONSENT_SOURCE_LABEL[customer.marketing_consent_source ?? 'manual'] ?? 'salonda'} verildi.`
+                      : 'Yalnızca müşteri kampanya mesajı almayı açıkça kabul ettiyse işaretleyin. Toplu mesaj sadece izinli müşterilere gider.'}
+                  </small>
+                </span>
+              </label>
               {error && <p className={styles.error}>{error}</p>}
               <button type="submit" className="btn-primary" disabled={editCustomerSubmitting}>
                 {editCustomerSubmitting ? 'Kaydediliyor…' : 'Değişiklikleri Kaydet'}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { OPT_OUT_FOOTER } from '../lib/marketing'
 import { useAuth } from '../contexts/AuthContext'
 import { SparkleIcon } from './icons'
 import Select from './Select'
@@ -158,6 +159,9 @@ export default function SendCampaignModal({
                 placeholder="Müşterilerinize göndermek istediğiniz mesajı yazın veya yukarıdan AI ile oluşturun…"
               />
             </div>
+            <p className={styles.hint}>
+              Mesajın sonuna otomatik eklenir: “{OPT_OUT_FOOTER}” Yalnızca kampanya izni olan müşterilere gider.
+            </p>
             <p className={styles.hint}>
               Not: WhatsApp bağlantısı henüz aktif değil, bu mesaj gerçekten gönderilmeyecek — kayıt altına alınacak.
             </p>

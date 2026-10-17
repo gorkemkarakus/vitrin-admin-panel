@@ -24,6 +24,7 @@ export interface Customer {
   full_name: string
   phone: string | null
   contact_phone: string | null
+  marketing_consent: boolean
 }
 interface Appointment {
   customer_id: string | null
@@ -87,7 +88,7 @@ export default function TopluMesajPage() {
     setLoading(true)
     const [{ data: custs }, { data: appts }, { data: svcs }, { data: groups }, { data: members }, { data: tmpls }] =
       await Promise.all([
-        fetchAll(() => supabase.from('customers').select('id, full_name, phone, contact_phone').order('id')),
+        fetchAll(() => supabase.from('customers').select('id, full_name, phone, contact_phone, marketing_consent').order('id')),
         fetchAll(() => supabase.from('appointments').select('customer_id, service_id, status, scheduled_at').order('id')),
         supabase.from('services').select('id, name'),
         supabase.from('customer_groups').select('id, name, description').order('created_at', { ascending: false }),
@@ -239,8 +240,11 @@ export default function TopluMesajPage() {
     return nameOnly
   }, [appointments, services])
 
+  // Kampanya yalnizca ticari ileti izni olanlara gider (sunucu da ayrica suzer).
+  const consentedOf = (ids: string[]) => ids.filter((id) => customers.find((c) => c.id === id)?.marketing_consent)
+
   function openSend(group: UiGroup) {
-    setSendTarget({ name: group.name, memberIds: group.memberIds, prefill: pendingTemplateMessage ?? undefined })
+    setSendTarget({ name: group.name, memberIds: consentedOf(group.memberIds), prefill: pendingTemplateMessage ?? undefined })
     setPendingTemplateMessage(null)
   }
 
@@ -302,7 +306,9 @@ export default function TopluMesajPage() {
                       <span className={styles.groupText}>
                         <span className={styles.groupName}>{g.name}</span>
                         <span className={styles.groupDesc}>{g.description}</span>
-                        <span className={styles.groupCount}>{g.memberIds.length} kişi</span>
+                        <span className={styles.groupCount}>
+                          {g.memberIds.length} kişi · {consentedOf(g.memberIds).length} kampanya izinli
+                        </span>
                       </span>
                     </button>
                     <div className={styles.groupActions}>
@@ -310,7 +316,8 @@ export default function TopluMesajPage() {
                         type="button"
                         className={`btn-secondary ${styles.sendBtn}`}
                         onClick={() => openSend(g)}
-                        disabled={g.memberIds.length === 0}
+                        disabled={consentedOf(g.memberIds).length === 0}
+                        title={consentedOf(g.memberIds).length === 0 ? 'Bu grupta kampanya izni olan müşteri yok' : undefined}
                       >
                         <SendIcon width={13} height={13} />
                         Mesaj Gönder
