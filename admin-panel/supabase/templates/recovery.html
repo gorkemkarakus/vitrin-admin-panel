@@ -1,6 +1,6 @@
 <!--
   Supabase Dashboard > Authentication > Emails > Templates > "Reset password"
-  Konu: Adapptiv şifre sıfırlama
+  Konu: Adapptiv şifre sıfırlama kodunuz: {{ .Token }}
   Bu dosyanin TAMAMINI sablon alanina yapistirin. Logo tanitim sitesinden
   yuklenir (https://www.adapptivdigital.com/assets/logo.png); dosya tasinirsa burayi da guncelleyin.
 -->
@@ -11,10 +11,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <meta name="supported-color-schemes" content="light" />
-    <title>Adapptiv şifre sıfırlama</title>
+    <title>Adapptiv şifre sıfırlama kodunuz: {{ .Token }}</title>
   </head>
   <body style="margin:0;padding:0;background:#eef1f6;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#eef1f6;">Yeni şifrenizi belirlemek için bağlantı içeride.</div>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#eef1f6;">Kodu uygulamaya yazıp yeni şifrenizi belirleyin.</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f6;">
       <tr>
         <td align="center" style="padding:36px 16px 40px;">
@@ -31,18 +31,12 @@
                     <td style="padding:32px 32px 34px;">
                       <span style="display:inline-block;background:#fff4ec;color:#b4470a;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;border-radius:999px;">Şifre sıfırlama</span>
                       <h1 style="margin:18px 0 12px;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:26px;line-height:1.25;font-weight:700;color:#111827;">Yeni şifrenizi belirleyin</h1>
-                      <p style="margin:0 0 28px;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;color:#4b5563;">Adapptiv hesabınız için şifre sıfırlama istendi. Aşağıdaki düğmeyle yeni şifrenizi belirleyebilirsiniz; bağlantı kısa bir süre geçerlidir.</p>
-                      <table role="presentation" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td align="center" bgcolor="#13284f" style="border-radius:14px;background:#13284f;">
-                            <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:15px 34px;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:14px;">Yeni şifre belirle&nbsp;&nbsp;<span style="color:#ff6a13;">&rarr;</span></a>
-                          </td>
-                        </tr>
+                      <p style="margin:0 0 28px;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.65;color:#4b5563;">Adapptiv hesabınız için şifre sıfırlama istendi. Aşağıdaki kodu uygulamadaki “Şifremi unuttum” ekranına yazıp yeni şifrenizi belirleyin.</p>
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f8;border-radius:16px;">
+                        <tr><td align="center" style="padding:18px 16px 4px;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">Sıfırlama kodunuz</td></tr>
+                        <tr><td align="center" style="padding:4px 16px 20px;font-family:'Courier New', Consolas, monospace;font-size:34px;line-height:1.2;font-weight:700;letter-spacing:10px;color:#13284f;">{{ .Token }}</td></tr>
                       </table>
-                      <p style="margin:26px 0 0;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:12px;line-height:1.6;color:#9ca3af;">
-                        Düğme çalışmazsa bu bağlantıyı tarayıcınıza yapıştırın:<br />
-                        <a href="{{ .ConfirmationURL }}" style="color:#6b7280;word-break:break-all;">{{ .ConfirmationURL }}</a>
-                      </p>
+                      <p style="margin:14px 0 0;font-family:'Segoe UI', Helvetica, Arial, sans-serif;font-size:13px;line-height:1.6;color:#6b7280;">Kod 1 saat geçerlidir. Kimseyle paylaşmayın; Adapptiv sizden bu kodu asla telefonla istemez.</p>
                     </td>
                   </tr>
                 </table>
