@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
 
     const { data: newBusiness, error: bizErr } = await admin
       .from('businesses')
-      .insert({ name })
+      .insert({ name, signup_source: 'operator' })
       .select('id, name, slug')
       .single()
     if (bizErr || !newBusiness) {

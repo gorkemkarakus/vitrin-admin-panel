@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { isPwnedPassword, PWNED_PASSWORD_MESSAGE } from '../_shared/pwned.ts'
 import { planLimit, planLimitResponse, requireFeature } from '../_shared/plan.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 
@@ -41,6 +42,7 @@ Deno.serve(async (req) => {
   if (password.length < 8) {
     return json({ error: 'Şifre en az 8 karakter olmalı' }, 400)
   }
+  if (await isPwnedPassword(password)) return json({ error: PWNED_PASSWORD_MESSAGE, code: 'PWNED' }, 400)
   const phoneDigits = phone.replace(/\D/g, '')
   if (phoneDigits.length < 10) {
     return json({ error: 'Geçerli bir telefon numarası girin' }, 400)

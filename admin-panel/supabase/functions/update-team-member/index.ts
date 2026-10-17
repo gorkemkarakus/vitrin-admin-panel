@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/http.ts'
+import { isPwnedPassword, PWNED_PASSWORD_MESSAGE } from '../_shared/pwned.ts'
 import { requireAdmin } from '../_shared/requireAdmin.ts'
 
 Deno.serve(async (req) => {
@@ -24,6 +25,9 @@ Deno.serve(async (req) => {
   if (!id) return json({ error: 'id zorunlu' }, 400)
   if (!email && !password) return json({ error: 'Güncellenecek e-posta veya şifre girin' }, 400)
   if (password && password.length < 8) return json({ error: 'Şifre en az 8 karakter olmalı' }, 400)
+  if (password && (await isPwnedPassword(password))) {
+    return json({ error: PWNED_PASSWORD_MESSAGE, code: 'PWNED' }, 400)
+  }
 
   // Hedef calisanin cagiranla AYNI isletmeye ait oldugunu dogrula — baska
   // isletmenin hesabini degistirmeyi engeller.
