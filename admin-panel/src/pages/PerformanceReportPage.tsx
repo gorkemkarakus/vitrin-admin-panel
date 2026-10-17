@@ -16,6 +16,7 @@ import { generatePerformanceReportPdf } from '../lib/pdf/performanceReportPdf'
 import { currencyWhole as currency } from '../lib/currency'
 import { toLocalDateString, presetDateRange } from '../lib/date'
 import styles from './PerformanceReportPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 interface Profile {
   id: string
@@ -419,7 +420,7 @@ export default function PerformanceReportPage() {
           <div className={styles.controlRow}>
             <div className={styles.searchBox}>
               <SearchIcon width={15} height={15} className={styles.searchIcon} />
-              <input
+              <input maxLength={FIELD_LIMITS.search}
                 className={styles.searchInput}
                 placeholder="Çalışan ara…"
                 value={search}

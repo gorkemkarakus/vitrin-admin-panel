@@ -8,6 +8,7 @@ import { currencyWhole as currency } from '../lib/currency'
 import { toLocalDateString } from '../lib/date'
 import { segmentForStats, type CustomerSegment } from '../lib/customerSegments'
 import styles from './CustomersPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 interface Customer {
   id: string
@@ -292,7 +293,7 @@ export default function CustomersPage() {
       <div className={styles.searchRow}>
         <div className={styles.searchBox}>
           <SearchIcon width={16} height={16} className={styles.searchIcon} />
-          <input
+          <input maxLength={FIELD_LIMITS.search}
             className={styles.searchInput}
             placeholder="Müşteri ara…"
             value={search}

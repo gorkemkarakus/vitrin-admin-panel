@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import { useAuth } from '../contexts/AuthContext'
 import styles from './LoginPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -38,7 +39,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="email">E-posta Adresi</label>
-            <input
+            <input maxLength={FIELD_LIMITS.email}
               id="email"
               type="email"
               placeholder="isletmeniz@ornek.com"
@@ -49,7 +50,7 @@ export default function LoginPage() {
           </div>
           <div className="field">
             <label htmlFor="password">Şifre</label>
-            <input
+            <input maxLength={FIELD_LIMITS.password}
               id="password"
               type="password"
               placeholder="••••••••••"
@@ -64,6 +65,11 @@ export default function LoginPage() {
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? 'Giriş yapılıyor…' : 'Giriş yap →'}
           </button>
+          <p className={styles.legal}>
+            Giriş yaparak <a href="/legal/kullanim-kosullari.html">Kullanım Koşulları</a>&apos;nı kabul etmiş olursunuz.
+            Verileriniz <a href="/legal/gizlilik.html">Gizlilik Politikası</a> ve{' '}
+            <a href="/legal/kvkk.html">KVKK Aydınlatma Metni</a>&apos;ne göre işlenir.
+          </p>
         </form>
       </div>
     </div>

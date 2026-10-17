@@ -9,7 +9,8 @@ import Select from '../components/Select'
 import { ChevronRightIcon, PhoneIcon, MailIcon, WalletIcon, PencilIcon, TrashIcon, ClockIcon, ServicesIcon, TrendingUpIcon, CalendarIcon } from '../components/icons'
 import { toLocalDateString } from '../lib/date'
 import styles from './CustomerDetailPage.module.css'
-import { CONSENT_SOURCE_LABEL } from '../lib/marketing'
+import { CONSENT_SOURCE_LABEL } from '../lib/marketing'import { FIELD_LIMITS } from '../lib/fieldLimits'
+
 
 interface Customer {
   id: string
@@ -700,7 +701,7 @@ export default function CustomerDetailPage() {
               </div>
               <div className="field">
                 <label htmlFor="payNote">Not (opsiyonel)</label>
-                <input id="payNote" value={payNote} onChange={(e) => setPayNote(e.target.value)} placeholder="ör. indirimli ödendi" />
+                <input maxLength={FIELD_LIMITS.paymentsNote} id="payNote" value={payNote} onChange={(e) => setPayNote(e.target.value)} placeholder="ör. indirimli ödendi" />
               </div>
               {error && <p className={styles.error}>{error}</p>}
               <button type="submit" className="btn-primary" disabled={paySubmitting || !payMethod}>
@@ -744,7 +745,7 @@ export default function CustomerDetailPage() {
               </div>
               <div className="field">
                 <label htmlFor="editNote">Not (opsiyonel)</label>
-                <input id="editNote" value={editNote} onChange={(e) => setEditNote(e.target.value)} placeholder="ör. indirimli ödendi" />
+                <input maxLength={FIELD_LIMITS.paymentsNote} id="editNote" value={editNote} onChange={(e) => setEditNote(e.target.value)} placeholder="ör. indirimli ödendi" />
               </div>
               {error && <p className={styles.error}>{error}</p>}
               <button type="submit" className="btn-primary" disabled={editSubmitting}>
@@ -767,7 +768,7 @@ export default function CustomerDetailPage() {
             <form onSubmit={submitEditCustomer}>
               <div className="field">
                 <label htmlFor="editCustomerName">Ad Soyad</label>
-                <input
+                <input maxLength={FIELD_LIMITS.customersFullName}
                   id="editCustomerName"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
@@ -777,7 +778,7 @@ export default function CustomerDetailPage() {
               </div>
               <div className="field">
                 <label htmlFor="editCustomerPhone">Telefon</label>
-                <input
+                <input maxLength={FIELD_LIMITS.customersContactPhone}
                   id="editCustomerPhone"
                   type="tel"
                   inputMode="numeric"
@@ -788,7 +789,7 @@ export default function CustomerDetailPage() {
               </div>
               <div className="field">
                 <label htmlFor="editCustomerEmail">E-posta</label>
-                <input
+                <input maxLength={FIELD_LIMITS.customersEmail}
                   id="editCustomerEmail"
                   type="email"
                   value={editEmail}

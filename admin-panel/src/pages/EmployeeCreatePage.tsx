@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import Select from '../components/Select'
 import { ChevronRightIcon } from '../components/icons'
 import styles from './EmployeeCreatePage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 const GENDER_OPTIONS = [
   { value: '', label: 'Belirtilmesin' },
@@ -66,7 +67,7 @@ export default function EmployeeCreatePage() {
         <form onSubmit={handleCreate}>
           <div className="field">
             <label htmlFor="fullName">Ad Soyad</label>
-            <input
+            <input maxLength={FIELD_LIMITS.profilesFullName}
               id="fullName"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -76,7 +77,7 @@ export default function EmployeeCreatePage() {
           </div>
           <div className="field">
             <label htmlFor="newEmail">E-posta</label>
-            <input
+            <input maxLength={FIELD_LIMITS.email}
               id="newEmail"
               type="email"
               value={email}
@@ -87,7 +88,7 @@ export default function EmployeeCreatePage() {
           </div>
           <div className="field">
             <label htmlFor="newPhone">Telefon</label>
-            <input
+            <input maxLength={FIELD_LIMITS.profilesWhatsappPhone}
               id="newPhone"
               type="tel"
               inputMode="numeric"
@@ -100,7 +101,7 @@ export default function EmployeeCreatePage() {
           </div>
           <div className="field">
             <label htmlFor="newPassword">Geçici şifre</label>
-            <input
+            <input maxLength={FIELD_LIMITS.password}
               id="newPassword"
               type="text"
               value={password}

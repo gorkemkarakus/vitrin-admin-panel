@@ -10,6 +10,8 @@ import StatusDropdown, { type StatusDropdownOption } from '../components/StatusD
 import Select from '../components/Select'
 import type { LayoutOutletContext } from '../layouts/DashboardLayout'
 import styles from './AppointmentsPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
+import { friendlyDbError } from '../lib/dbErrors'
 
 interface Customer {
   id: string
@@ -334,7 +336,7 @@ export default function AppointmentsPage() {
           .select('id')
           .single()
         if (custErr || !newCustomer) {
-          setError('Müşteri oluşturulamadı: ' + (custErr?.message ?? ''))
+          setError(friendlyDbError(custErr, 'Müşteri oluşturulamadı, tekrar deneyin.'))
           setSubmitting(false)
           return
         }
@@ -358,7 +360,7 @@ export default function AppointmentsPage() {
         setError(
           isOverlap
             ? 'Seçilen çalışan bu saatte az önce başka bir randevuyla dolmuş. Lütfen farklı bir saat seçin.'
-            : 'Randevu oluşturulamadı: ' + apptErr.message,
+            : friendlyDbError(apptErr, 'Randevu oluşturulamadı, tekrar deneyin.'),
         )
         return
       }
@@ -598,14 +600,14 @@ export default function AppointmentsPage() {
               ) : (
                 <div className="field">
                   <label htmlFor="newCustomerName">Yeni müşteri</label>
-                  <input
+                  <input maxLength={FIELD_LIMITS.customersFullName}
                     id="newCustomerName"
                     placeholder="Ad Soyad"
                     value={newCustomerName}
                     onChange={(e) => setNewCustomerName(e.target.value)}
                     style={{ marginBottom: 8 }}
                   />
-                  <input
+                  <input maxLength={FIELD_LIMITS.customersContactPhone}
                     placeholder="Telefon (opsiyonel)"
                     value={newCustomerPhone}
                     onChange={(e) => setNewCustomerPhone(e.target.value)}
@@ -664,7 +666,7 @@ export default function AppointmentsPage() {
 
               <div className="field">
                 <label htmlFor="sourceNote">Not (opsiyonel)</label>
-                <input
+                <input maxLength={FIELD_LIMITS.appointmentsSourceNote}
                   id="sourceNote"
                   placeholder="ör. kampanya adı"
                   value={sourceNote}

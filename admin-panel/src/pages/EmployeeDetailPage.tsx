@@ -16,6 +16,8 @@ import {
   PlusIcon,
 } from '../components/icons'
 import styles from './EmployeeDetailPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
+import { friendlyDbError } from '../lib/dbErrors'
 
 const GENDER_OPTIONS = [
   { value: '', label: 'Belirtilmesin' },
@@ -231,7 +233,7 @@ export default function EmployeeDetailPage() {
       .eq('id', id)
     if (err) {
       const isDupPhone = err.code === '23505' && err.message.includes('whatsapp_phone')
-      setProfileError(isDupPhone ? 'Bu telefon numarası başka bir ekip üyesine kayıtlı.' : 'Kaydedilemedi: ' + err.message)
+      setProfileError(isDupPhone ? 'Bu telefon numarası başka bir ekip üyesine kayıtlı.' : friendlyDbError(err, 'Kaydedilemedi, tekrar deneyin.'))
       setSavingProfile(false)
       return
     }
@@ -551,11 +553,11 @@ export default function EmployeeDetailPage() {
         <h2 style={{ marginBottom: 12 }}>Kişisel Bilgiler</h2>
         <div className={styles.profileField}>
           <label htmlFor="empName">Ad Soyad</label>
-          <input id="empName" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Ad Soyad" />
+          <input maxLength={FIELD_LIMITS.profilesFullName} id="empName" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Ad Soyad" />
         </div>
         <div className={styles.profileField}>
           <label htmlFor="empPhone">Telefon</label>
-          <input
+          <input maxLength={FIELD_LIMITS.profilesWhatsappPhone}
             id="empPhone"
             type="tel"
             inputMode="numeric"
@@ -583,7 +585,7 @@ export default function EmployeeDetailPage() {
           <p className={styles.accountHint}>Değiştirmek istemediğin alanı boş bırak.</p>
           <div className={styles.profileField}>
             <label htmlFor="empEmail">Yeni E-posta</label>
-            <input
+            <input maxLength={FIELD_LIMITS.email}
               id="empEmail"
               type="email"
               value={accountEmail}
@@ -593,7 +595,7 @@ export default function EmployeeDetailPage() {
           </div>
           <div className={styles.profileField}>
             <label htmlFor="empPassword">Yeni Şifre</label>
-            <input
+            <input maxLength={FIELD_LIMITS.password}
               id="empPassword"
               type="text"
               value={accountPassword}

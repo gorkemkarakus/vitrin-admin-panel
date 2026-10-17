@@ -7,6 +7,7 @@ import { toLocalDateString } from '../lib/date'
 import Avatar from '../components/Avatar'
 import { AlertTriangleIcon, CalendarIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '../components/icons'
 import styles from './EmployeeLeavesPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 interface Employee {
   id: string
@@ -572,7 +573,7 @@ export default function EmployeeLeavesPage() {
 
         <div className={styles.leaveLabelField}>
           <label>Etiket (opsiyonel)</label>
-          <input value={leaveLabel} onChange={(e) => setLeaveLabel(e.target.value)} placeholder="ör. Yıllık İzin" />
+          <input maxLength={FIELD_LIMITS.employeeTimeBlocksLabel} value={leaveLabel} onChange={(e) => setLeaveLabel(e.target.value)} placeholder="ör. Yıllık İzin" />
         </div>
 
         <button type="button" className={`btn-primary ${styles.addLeaveBtn}`} onClick={addLeaveDraft}>

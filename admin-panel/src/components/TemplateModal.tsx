@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { SparkleIcon } from './icons'
 import type { Template } from '../pages/TopluMesajPage'
 import styles from './TemplateModal.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
+import { friendlyDbError } from '../lib/dbErrors'
 
 export default function TemplateModal({
   template,
@@ -64,7 +66,7 @@ export default function TemplateModal({
         .update({ title: title.trim(), message: message.trim() })
         .eq('id', template.id)
       if (err) {
-        setError(err.message)
+        setError(friendlyDbError(err, 'Şablon kaydedilemedi, tekrar deneyin.'))
         setSaving(false)
         return
       }
@@ -74,7 +76,7 @@ export default function TemplateModal({
         .from('campaign_message_templates')
         .insert({ business_id: profile.business_id, title: title.trim(), message: message.trim() })
       if (err) {
-        setError(err.message)
+        setError(friendlyDbError(err, 'Şablon kaydedilemedi, tekrar deneyin.'))
         setSaving(false)
         return
       }
@@ -89,7 +91,7 @@ export default function TemplateModal({
     if (!ok) return
     const { error: err } = await supabase.from('campaign_message_templates').delete().eq('id', template.id)
     if (err) {
-      setError(err.message)
+      setError(friendlyDbError(err, 'Şablon kaydedilemedi, tekrar deneyin.'))
       return
     }
     onDeleted()
@@ -102,7 +104,7 @@ export default function TemplateModal({
 
         <div className="field">
           <label htmlFor="templateTitle">Başlık</label>
-          <input id="templateTitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. İptal Edenler için hatırlatma" />
+          <input maxLength={FIELD_LIMITS.campaignMessageTemplatesTitle} id="templateTitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Örn. İptal Edenler için hatırlatma" />
         </div>
         <div className={styles.aiBlock}>
           <span className={styles.aiLabel}>
@@ -110,7 +112,7 @@ export default function TemplateModal({
             AI ile Oluştur
           </span>
           <div className={styles.aiRow}>
-            <input
+            <input maxLength={FIELD_LIMITS.aiPrompt}
               className={styles.aiInput}
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
@@ -130,7 +132,7 @@ export default function TemplateModal({
 
         <div className="field">
           <label htmlFor="templateMessage">Mesaj</label>
-          <textarea
+          <textarea maxLength={FIELD_LIMITS.campaignMessageTemplatesMessage}
             id="templateMessage"
             rows={5}
             value={message}

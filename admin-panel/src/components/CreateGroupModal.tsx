@@ -5,6 +5,8 @@ import { SearchIcon, CheckCircleIcon } from './icons'
 import Avatar from './Avatar'
 import type { Customer } from '../pages/TopluMesajPage'
 import styles from './CreateGroupModal.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
+import { friendlyDbError } from '../lib/dbErrors'
 
 export default function CreateGroupModal({
   customers,
@@ -50,7 +52,7 @@ export default function CreateGroupModal({
       .select()
       .single()
     if (groupErr || !group) {
-      setError(groupErr?.message ?? 'Grup oluşturulamadı')
+      setError(friendlyDbError(groupErr, 'Grup oluşturulamadı.'))
       setSaving(false)
       return
     }
@@ -62,7 +64,7 @@ export default function CreateGroupModal({
       }))
       const { error: memberErr } = await supabase.from('customer_group_members').insert(rows)
       if (memberErr) {
-        setError(memberErr.message)
+        setError(friendlyDbError(memberErr, 'Grup üyeleri eklenemedi.'))
         setSaving(false)
         return
       }
@@ -78,11 +80,11 @@ export default function CreateGroupModal({
 
         <div className="field">
           <label htmlFor="groupName">Grup Adı</label>
-          <input id="groupName" value={name} onChange={(e) => setName(e.target.value)} placeholder="Örn. VIP Müşteriler" />
+          <input maxLength={FIELD_LIMITS.customerGroupsName} id="groupName" value={name} onChange={(e) => setName(e.target.value)} placeholder="Örn. VIP Müşteriler" />
         </div>
         <div className="field">
           <label htmlFor="groupDesc">Açıklama (opsiyonel)</label>
-          <input id="groupDesc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Bu grup ne için?" />
+          <input maxLength={FIELD_LIMITS.customerGroupsDescription} id="groupDesc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Bu grup ne için?" />
         </div>
 
         <div className={styles.pickerLabel}>
@@ -90,7 +92,7 @@ export default function CreateGroupModal({
         </div>
         <div className={styles.searchBox}>
           <SearchIcon width={15} height={15} className={styles.searchIcon} />
-          <input
+          <input maxLength={FIELD_LIMITS.search}
             className={styles.searchInput}
             placeholder="Müşteri ara…"
             value={search}

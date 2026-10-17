@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import styles from './SettingsPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 const REMINDER_OPTIONS = [
   { value: '', label: 'Kapalı' },
@@ -137,7 +138,7 @@ export default function SettingsPage() {
           <p style={{ color: 'var(--text-dim)' }}>Yükleniyor…</p>
         ) : (
           <div className={styles.row}>
-            <input
+            <input maxLength={FIELD_LIMITS.profilesWhatsappPhone}
               className={styles.input}
               type="text"
               placeholder="05551234567"
@@ -150,6 +151,16 @@ export default function SettingsPage() {
           </div>
         )}
         {phoneMsg && <p className={phoneMsg.type === 'ok' ? styles.msgOk : styles.msgErr}>{phoneMsg.text}</p>}
+      </div>
+
+      <div className="card">
+        <h2 className={styles.cardTitle}>Hakkında</h2>
+        <p className={styles.cardHint}>
+          <a href="/legal/gizlilik.html" target="_blank" rel="noopener noreferrer">Gizlilik Politikası</a> ·{' '}
+          <a href="/legal/kvkk.html" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni</a> ·{' '}
+          <a href="/legal/kullanim-kosullari.html" target="_blank" rel="noopener noreferrer">Kullanım Koşulları</a> ·{' '}
+          <a href="/legal/hesap-silme.html" target="_blank" rel="noopener noreferrer">Hesap ve veri silme</a>
+        </p>
       </div>
     </div>
   )

@@ -14,6 +14,7 @@ import {
 import Avatar from '../components/Avatar'
 import { toLocalDateString } from '../lib/date'
 import styles from './TeamPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 interface Employee {
   id: string
@@ -189,7 +190,7 @@ export default function TeamPage() {
       <div className={styles.searchRow}>
         <div className={styles.searchBox}>
           <SearchIcon width={16} height={16} className={styles.searchIcon} />
-          <input
+          <input maxLength={FIELD_LIMITS.search}
             className={styles.searchInput}
             placeholder="Ekip üyesi ara…"
             value={search}

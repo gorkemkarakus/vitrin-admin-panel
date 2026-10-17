@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import type { LayoutOutletContext } from '../layouts/DashboardLayout'
 import { currency } from '../lib/currency'
 import styles from './ServicesPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 interface Service {
   id: string
@@ -133,7 +134,7 @@ export default function ServicesPage() {
         <form className={styles.form} onSubmit={handleCreate}>
           <div className="field">
             <label htmlFor="serviceName">Hizmet adı</label>
-            <input
+            <input maxLength={FIELD_LIMITS.servicesName}
               id="serviceName"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -191,7 +192,7 @@ export default function ServicesPage() {
               {visibleServices.map((s) => (
                 <tr key={s.id} className={s.is_active ? '' : styles.inactive}>
                   <td>
-                    <input
+                    <input maxLength={FIELD_LIMITS.servicesName}
                       className={styles.nameInput}
                       defaultValue={s.name}
                       onBlur={(e) => {

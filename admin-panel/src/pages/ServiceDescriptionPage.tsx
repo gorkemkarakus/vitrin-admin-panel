@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import styles from './ServiceDescriptionPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 interface Service {
   id: string
@@ -82,7 +83,7 @@ export default function ServiceDescriptionPage() {
       </div>
 
       <div className="card">
-        <textarea
+        <textarea maxLength={FIELD_LIMITS.servicesDescription}
           className={styles.textarea}
           value={description}
           onChange={(e) => setDescription(e.target.value)}

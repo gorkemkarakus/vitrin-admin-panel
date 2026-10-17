@@ -14,6 +14,7 @@ import {
 import { currency } from '../lib/currency'
 import { toLocalDateString, presetDateRange, type DateRangePreset } from '../lib/date'
 import styles from './GiderlerPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 interface Expense {
   id: string
@@ -247,7 +248,7 @@ export default function GiderlerPage() {
         <form className={styles.expenseForm} onSubmit={addExpense}>
           <div className={styles.expenseField}>
             <label htmlFor="expenseDesc">Açıklama</label>
-            <input
+            <input maxLength={FIELD_LIMITS.businessExpensesDescription}
               id="expenseDesc"
               ref={expenseDescRef}
               type="text"
@@ -335,7 +336,7 @@ export default function GiderlerPage() {
 
       <div className={styles.searchBox}>
         <SearchIcon width={16} height={16} className={styles.searchIcon} />
-        <input
+        <input maxLength={FIELD_LIMITS.search}
           className={styles.searchInput}
           placeholder="Gider ara…"
           value={expenseSearch}

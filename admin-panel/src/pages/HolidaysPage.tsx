@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { AlertTriangleIcon, CalendarIcon, ChevronRightIcon, TrashIcon, UmbrellaIcon } from '../components/icons'
 import styles from './HolidaysPage.module.css'
+import { FIELD_LIMITS } from '../lib/fieldLimits'
 
 // Resmi tatiller ayri bir tablo yerine mevcut employee_time_blocks
 // altyapisi uzerinden, HER AKTIF CALISAN icin ayni tarih/etiketle tek tek
@@ -202,7 +203,7 @@ export default function HolidaysPage() {
 
         <div className={styles.field}>
           <label>Etiket</label>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="ör. Ramazan Bayramı" />
+          <input maxLength={FIELD_LIMITS.businessHolidaysName} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="ör. Ramazan Bayramı" />
         </div>
 
         <button

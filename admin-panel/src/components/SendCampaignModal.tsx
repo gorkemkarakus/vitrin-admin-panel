@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { SparkleIcon } from './icons'
 import Select from './Select'
 import type { Template } from '../pages/TopluMesajPage'
-import styles from './SendCampaignModal.module.css'
+import styles from './SendCampaignModal.module.css'import { FIELD_LIMITS } from '../lib/fieldLimits'
+
 
 export default function SendCampaignModal({
   targetName,
@@ -132,7 +133,7 @@ export default function SendCampaignModal({
                 AI ile Oluştur
               </span>
               <div className={styles.aiRow}>
-                <input
+                <input maxLength={FIELD_LIMITS.aiPrompt}
                   className={styles.aiInput}
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
@@ -151,7 +152,7 @@ export default function SendCampaignModal({
             </div>
             <div className="field">
               <label htmlFor="campaignMessage">Mesaj</label>
-              <textarea
+              <textarea maxLength={FIELD_LIMITS.campaignMessageTemplatesMessage}
                 id="campaignMessage"
                 rows={5}
                 value={message}

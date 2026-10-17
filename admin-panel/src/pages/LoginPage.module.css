@@ -41,3 +41,16 @@
   font-size: 13px;
   margin-bottom: 12px;
 }
+
+.legal {
+  margin-top: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.legal a {
+  color: var(--signal);
+  font-weight: 600;
+}
