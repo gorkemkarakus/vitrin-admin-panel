@@ -155,7 +155,8 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   }
 
   const phoneNumberId = value?.metadata?.phone_number_id ?? null
-  const business = await resolveBusiness(admin, req, phoneNumberId)
+  // Istek Meta imzasiyla dogrulandi; numara kimligi guvenilir.
+  const business = await resolveBusiness(admin, req, phoneNumberId, { trusted: true })
   if (!business) {
     console.log('whatsapp-webhook: işletme bulunamadı, phone_number_id:', phoneNumberId)
     return
