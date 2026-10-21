@@ -4,7 +4,7 @@ import { timingSafeEqualString } from '../_shared/crypto.ts'
 import { botSharedSecret, resolveBusiness } from '../_shared/resolveBusiness.ts'
 import { runChatbot } from '../_shared/chatbot.ts'
 import { isOptOutMessage } from '../_shared/marketing.ts'
-import { sendWhatsAppText } from '../_shared/notify.ts'
+import { sendTypingIndicator, sendWhatsAppText } from '../_shared/notify.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
@@ -135,6 +135,8 @@ async function answerWithChatbot(admin: SupabaseClient, payload: N8nForwardPaylo
     console.error('whatsapp-webhook: phone_number_id yok, cevap gönderilemez')
     return
   }
+  // cevap hazirlanirken musteri "yaziyor..." gorur; beklenmez
+  const typing = sendTypingIndicator({ phoneNumberId: payload.phone_number_id, messageId: payload.wamid })
   let result
   try {
     result = await runChatbot(payload, { supabaseUrl, anonKey, openaiKey, botSecret })
@@ -142,6 +144,7 @@ async function answerWithChatbot(admin: SupabaseClient, payload: N8nForwardPaylo
     console.error('whatsapp-webhook: asistan hatası:', e instanceof Error ? e.message : e, 'wamid:', payload.wamid)
     return
   }
+  await typing
   if (!result.reply.trim()) {
     console.log('whatsapp-webhook: asistan boş cevap döndürdü (personel devraldı ya da işletme yok), gönderim atlanıyor')
     await result.log

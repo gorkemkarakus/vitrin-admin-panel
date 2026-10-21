@@ -53,11 +53,15 @@ const openaiTool = (name: string, args: Record<string, unknown>) => ({
 
 Deno.test('personel numarasi: komut asistaninin cevabi doner, musteri asistani calismaz', async () => {
   const calls: Call[] = []
-  const r = await runChatbot(input, deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: true, reply: 'Bugün 3 randevun var' } }, calls)))
+  const r = await runChatbot(
+    input,
+    deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: true, reply: 'Bugün 3 randevun var' }, 'chatbot-context': context }, calls)),
+  )
   assertEquals(r.reply, 'Bugün 3 randevun var')
-  assertEquals(calls.length, 1)
-  assertEquals(calls[0].headers['x-bot-secret'], 'gizli')
-  assertEquals(calls[0].body, { phone: input.from, message: input.message, phone_number_id: 'pn-1' })
+  assert(!calls.some((c) => c.url.includes('openai')))
+  const staff = calls.find((c) => c.url.endsWith('staff-whatsapp-webhook'))!
+  assertEquals(staff.headers['x-bot-secret'], 'gizli')
+  assertEquals(staff.body, { phone: input.from, message: input.message, phone_number_id: 'pn-1' })
 })
 
 Deno.test('bot susturulmus: bos cevap, OpenAI cagrilmaz', async () => {
@@ -242,4 +246,63 @@ Deno.test('OpenAI hatasi: hata firlar (webhook musteriye bir sey gondermez)', as
     threw = true
   }
   assert(threw)
+})
+
+// "saat 1'de" -> model 01:00 dese bile randevu acilmaz, once 13:00 sorulur
+const bookingAt = (time: string) =>
+  openaiTool('book_appointment', {
+    service_name: 'Pedikür',
+    date: '2026-10-22',
+    time,
+    customer_full_name: 'Görkem Karakuş',
+    customer_contact_phone: '05413402738',
+  })
+const routesFor = (time: string) => ({
+  'staff-whatsapp-webhook': { handled: false },
+  'chatbot-context': context,
+  openai: bookingAt(time),
+  'book-appointment': {
+    status: 'booked',
+    appointment: { service_name: 'Pedikür', scheduled_at: '2026-10-22T10:00:00Z', employee_name: 'Elif Yılmaz' },
+  },
+  'chatbot-log-message': { ok: true },
+})
+
+Deno.test('dakikasiz "saat 1": randevu acilmaz, oglenden sonrasi sorulur ve kaydedilir', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot({ ...input, message: 'Saat 1 de 05413402738 Görkem karakuş' }, deps(fakeFetch(routesFor('01:00'), calls)))
+  await r.log
+  assert(!calls.some((c) => c.url.endsWith('book-appointment')))
+  assertEquals(r.reply, 'Öğleden sonra 13:00 olarak alayım mı?')
+  const log = calls.find((c) => c.url.endsWith('chatbot-log-message'))!
+  assertEquals((log.body.messages as { content: string }[])[1].content, 'Öğleden sonra 13:00 olarak alayım mı?')
+})
+
+Deno.test('acikca "gece 01:30" ya da "sabah 7": istendigi gibi randevu denenir', async () => {
+  for (const [message, time] of [
+    ['gece 01:30 olsun', '01:30'],
+    ['sabah 7 uygun', '07:00'],
+    ['saat 07:15 olur', '07:15'],
+  ]) {
+    const calls: Call[] = []
+    const r = await runChatbot({ ...input, message }, deps(fakeFetch(routesFor(time), calls)))
+    await r.log
+    assert(calls.some((c) => c.url.endsWith('book-appointment')), message)
+  }
+})
+
+Deno.test('13:00 ve 10:00 gibi saatler sorulmadan alinir', async () => {
+  for (const time of ['13:00', '10:00', '08:30']) {
+    const calls: Call[] = []
+    const r = await runChatbot({ ...input, message: 'tamam' }, deps(fakeFetch(routesFor(time), calls)))
+    await r.log
+    assert(calls.some((c) => c.url.endsWith('book-appointment')), time)
+  }
+})
+
+Deno.test('tarih "1.11" saat sanilmaz: "1.11 saat 1" yine sorulur', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot({ ...input, message: '1.11.2026 saat 1' }, deps(fakeFetch(routesFor('01:00'), calls)))
+  await r.log
+  assertEquals(r.reply, 'Öğleden sonra 13:00 olarak alayım mı?')
 })

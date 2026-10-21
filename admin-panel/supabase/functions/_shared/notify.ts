@@ -62,6 +62,29 @@ export async function sendWhatsAppText(params: {
   }
 }
 
+// Musterinin mesajini "okundu" yapar ve asistan cevabi hazirlarken WhatsApp'ta
+// "yaziyor..." gosterir (Meta en fazla 25 sn gosterir, cevap gelince kalkar).
+// Basarisiz olursa sessizce gecilir; cevap yine gider.
+export async function sendTypingIndicator(params: { phoneNumberId: string; messageId: string }): Promise<void> {
+  const token = Deno.env.get('WHATSAPP_TOKEN')
+  if (!token) return
+  try {
+    await fetch(`https://graph.facebook.com/v25.0/${params.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: params.messageId,
+        typing_indicator: { type: 'text' },
+      }),
+      signal: AbortSignal.timeout(5000),
+    })
+  } catch {
+    // gostergesiz devam
+  }
+}
+
 // TEK gonderim noktasi (bildirim/hatirlatma/kampanya). notification_log
 // yazimi HER ZAMAN calisir (denetim izi, WhatsApp baglantisindan bagimsiz).
 // phoneNumberId verilmemisse (isletme henuz WhatsApp'a baglanmadiysa —
