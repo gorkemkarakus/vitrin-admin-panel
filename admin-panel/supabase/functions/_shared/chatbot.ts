@@ -79,7 +79,15 @@ export function askAboutEarlyHour(parsed: Json, message: string, context: Json):
   const writtenExactly = new RegExp(`(^|[^\\d])0?${hour}[:.][0-5]\\d(?![.\\d])`).test(customerText)
   const saidNightOrMorning = /(^|[^a-zçğıöşü])(gece|sabah)/.test(customerText)
   if (writtenExactly || saidNightOrMorning) return null
-  return `Öğleden sonra ${hour + 12}:${m[2]} olarak alayım mı?`
+  return earlyHourQuestionText(hour, m[2])
+}
+
+// "Öğlen 1, yani 13:00 uygun mu?" — insanlarin konustugu gibi; saate ek
+// gerekmesin diye soru "uygun mu" ile biter.
+export function earlyHourQuestionText(hour: number, minute: string): string {
+  const part = hour <= 2 ? 'Öğlen' : hour <= 5 ? 'Öğleden sonra' : 'Akşam'
+  const spoken = minute === '00' ? String(hour) : `${hour}:${minute}`
+  return `${part} ${spoken}, yani ${hour + 12}:${minute} uygun mu?`
 }
 
 export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promise<ChatbotResult> {

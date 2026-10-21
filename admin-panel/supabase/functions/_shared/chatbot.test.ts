@@ -2,7 +2,7 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { runChatbot, type ChatbotInput } from './chatbot.ts'
+import { earlyHourQuestionText, runChatbot, type ChatbotInput } from './chatbot.ts'
 
 const BASE = 'https://ornek.supabase.co'
 const input: ChatbotInput = {
@@ -273,9 +273,9 @@ Deno.test('dakikasiz "saat 1": randevu acilmaz, oglenden sonrasi sorulur ve kayd
   const r = await runChatbot({ ...input, message: 'Saat 1 de 05413402738 Görkem karakuş' }, deps(fakeFetch(routesFor('01:00'), calls)))
   await r.log
   assert(!calls.some((c) => c.url.endsWith('book-appointment')))
-  assertEquals(r.reply, 'Öğleden sonra 13:00 olarak alayım mı?')
+  assertEquals(r.reply, 'Öğlen 1, yani 13:00 uygun mu?')
   const log = calls.find((c) => c.url.endsWith('chatbot-log-message'))!
-  assertEquals((log.body.messages as { content: string }[])[1].content, 'Öğleden sonra 13:00 olarak alayım mı?')
+  assertEquals((log.body.messages as { content: string }[])[1].content, 'Öğlen 1, yani 13:00 uygun mu?')
 })
 
 Deno.test('acikca "gece 01:30" ya da "sabah 7": istendigi gibi randevu denenir', async () => {
@@ -304,5 +304,12 @@ Deno.test('tarih "1.11" saat sanilmaz: "1.11 saat 1" yine sorulur', async () => 
   const calls: Call[] = []
   const r = await runChatbot({ ...input, message: '1.11.2026 saat 1' }, deps(fakeFetch(routesFor('01:00'), calls)))
   await r.log
-  assertEquals(r.reply, 'Öğleden sonra 13:00 olarak alayım mı?')
+  assertEquals(r.reply, 'Öğlen 1, yani 13:00 uygun mu?')
+})
+
+Deno.test('saat sorusu gunun bolumune gore dogal kurulur', () => {
+  assertEquals(earlyHourQuestionText(1, '00'), 'Öğlen 1, yani 13:00 uygun mu?')
+  assertEquals(earlyHourQuestionText(4, '00'), 'Öğleden sonra 4, yani 16:00 uygun mu?')
+  assertEquals(earlyHourQuestionText(7, '00'), 'Akşam 7, yani 19:00 uygun mu?')
+  assertEquals(earlyHourQuestionText(2, '30'), 'Öğlen 2:30, yani 14:30 uygun mu?')
 })
