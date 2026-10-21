@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
-import { resolveBusiness } from '../_shared/resolveBusiness.ts'
+import { botSharedSecret, resolveBusiness } from '../_shared/resolveBusiness.ts'
+import { runChatbot } from '../_shared/chatbot.ts'
 import { isOptOutMessage } from '../_shared/marketing.ts'
 import { sendWhatsAppText } from '../_shared/notify.ts'
 
@@ -113,6 +114,50 @@ async function forwardToN8n(payload: N8nForwardPayload): Promise<void> {
   console.log('whatsapp-webhook: cevap gönderildi, message id:', sendResult.messageId, 'wamid:', payload.wamid)
 }
 
+// Musteri asistani artik burada (Supabase) calisiyor; n8n'e gitmiyor.
+// Cevap uretimi, randevu islemleri ve kayit chatbot.ts'te; burasi yalnizca
+// cevabi gonderir. Hata olursa musteriye bir sey gitmez, loglanir (n8n
+// yolundaki davranisla ayni).
+async function answerWithChatbot(admin: SupabaseClient, payload: N8nForwardPayload): Promise<void> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const openaiKey = Deno.env.get('OPENAI_API_KEY')
+  const botSecret = await botSharedSecret(admin)
+  if (!supabaseUrl || !anonKey || !openaiKey || !botSecret) {
+    console.error('whatsapp-webhook: asistan yapılandırması eksik', {
+      anon: !!anonKey,
+      openai: !!openaiKey,
+      bot_secret: !!botSecret,
+    })
+    return
+  }
+  if (!payload.phone_number_id) {
+    console.error('whatsapp-webhook: phone_number_id yok, cevap gönderilemez')
+    return
+  }
+  let result
+  try {
+    result = await runChatbot(payload, { supabaseUrl, anonKey, openaiKey, botSecret })
+  } catch (e) {
+    console.error('whatsapp-webhook: asistan hatası:', e instanceof Error ? e.message : e, 'wamid:', payload.wamid)
+    return
+  }
+  if (!result.reply.trim()) {
+    console.log('whatsapp-webhook: asistan boş cevap döndürdü (personel devraldı ya da işletme yok), gönderim atlanıyor')
+    await result.log
+    return
+  }
+  const [sendResult] = await Promise.all([
+    sendWhatsAppText({ phoneNumberId: payload.phone_number_id, to: payload.from, message: result.reply.trim() }),
+    result.log,
+  ])
+  if (!sendResult.ok) {
+    console.error('whatsapp-webhook: cevap gönderimi başarısız:', sendResult.error, 'wamid:', payload.wamid)
+    return
+  }
+  console.log('whatsapp-webhook: cevap gönderildi, message id:', sendResult.messageId, 'wamid:', payload.wamid)
+}
+
 // Yanit Meta'ya imza dogrulanir dogrulanmaz (bu fonksiyon cagrilmadan ONCE)
 // zaten 200 olarak gonderildi — o yuzden asagidaki her erken-cikis sadece
 // "daha fazla isleme yapma" anlamina geliyor, ayrica bir HTTP durum kodu
@@ -188,14 +233,17 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
     return
   }
 
-  await forwardToN8n({
+  const botPayload: N8nForwardPayload = {
     business_id: business.id,
     phone_number_id: phoneNumberId,
     from: message.from,
     customer_name: customerName,
     message: text,
     wamid,
-  })
+  }
+  // BOT_ENGINE=n8n: eski n8n akisina geri donus (yedek)
+  if (Deno.env.get('BOT_ENGINE') === 'n8n') await forwardToN8n(botPayload)
+  else await answerWithChatbot(admin, botPayload)
 }
 
 Deno.serve(async (req) => {

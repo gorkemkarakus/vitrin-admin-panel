@@ -34,14 +34,18 @@ export async function resolveBusiness(
 }
 
 // Paylasilan bot sirri: BOT_SHARED_SECRET ortam degiskeni ya da
-// _app_secrets.bot_shared_secret (yalnizca service role okur).
+// _app_secrets.bot_shared_secret (yalnizca service role okur). Musteri
+// asistani (chatbot.ts) bot fonksiyonlarini bununla cagirir.
+export async function botSharedSecret(admin: SupabaseClient): Promise<string | null> {
+  const fromEnv = Deno.env.get('BOT_SHARED_SECRET')
+  if (fromEnv) return fromEnv
+  const { data } = await admin.from('_app_secrets').select('value').eq('name', 'bot_shared_secret').maybeSingle()
+  return data?.value ?? null
+}
+
 async function hasValidBotSecret(admin: SupabaseClient, req: Request): Promise<boolean> {
   const provided = req.headers.get('x-bot-secret')
   if (!provided) return false
-  let secret = Deno.env.get('BOT_SHARED_SECRET') ?? null
-  if (!secret) {
-    const { data } = await admin.from('_app_secrets').select('value').eq('name', 'bot_shared_secret').maybeSingle()
-    secret = data?.value ?? null
-  }
+  const secret = await botSharedSecret(admin)
   return !!secret && timingSafeEqualString(provided, secret)
 }

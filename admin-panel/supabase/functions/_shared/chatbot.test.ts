@@ -1,0 +1,245 @@
+// Musteri asistaninin akis sirasi: her dal sahte cevaplarla denenir (OpenAI
+// ve veritabanina gercek istek gitmez). Calistir:
+//   deno test supabase/functions/_shared/chatbot.test.ts
+import { assert, assertEquals } from 'jsr:@std/assert@1'
+import { runChatbot, type ChatbotInput } from './chatbot.ts'
+
+const BASE = 'https://ornek.supabase.co'
+const input: ChatbotInput = {
+  business_id: 'biz-1',
+  phone_number_id: 'pn-1',
+  from: '905321112233',
+  customer_name: 'Ayşe',
+  message: 'Merhaba',
+  wamid: 'wamid.1',
+}
+
+const context = {
+  business_name: 'Güzel Salon',
+  bot_paused: false,
+  services: [{ name: 'Fön', duration_minutes: 30, price: 250 }],
+  employees: [{ name: 'Elif Yılmaz', services: ['Fön'] }],
+  working_hours: [{ day: 'Pazartesi', starts_at: '09:00', ends_at: '18:00' }],
+  appointments: [
+    { id: 'apt-1', service_name: 'Fön', scheduled_at: '2026-10-23T11:00:00Z', employee_name: 'Elif Yılmaz' },
+  ],
+  history: [],
+}
+
+interface Call {
+  url: string
+  headers: Record<string, string>
+  body: Record<string, unknown>
+}
+
+// fonksiyon adina / OpenAI'ye gore sahte cevap doner, cagrilari kaydeder
+function fakeFetch(routes: Record<string, unknown>, calls: Call[]): typeof fetch {
+  return (async (url: string | URL, init?: RequestInit) => {
+    const u = String(url)
+    const body = JSON.parse(String(init?.body ?? '{}'))
+    calls.push({ url: u, headers: init?.headers as Record<string, string>, body })
+    const key = u.includes('openai.com') ? 'openai' : u.split('/functions/v1/')[1]
+    if (!(key in routes)) throw new Error('beklenmeyen istek: ' + u)
+    return new Response(JSON.stringify(routes[key]), { status: 200 })
+  }) as typeof fetch
+}
+
+const deps = (f: typeof fetch) => ({ supabaseUrl: BASE, anonKey: 'anon', botSecret: 'gizli', openaiKey: 'sk-test', fetch: f })
+
+const openaiText = (content: string) => ({ choices: [{ message: { content } }] })
+const openaiTool = (name: string, args: Record<string, unknown>) => ({
+  choices: [{ message: { content: null, tool_calls: [{ function: { name, arguments: JSON.stringify(args) } }] } }],
+})
+
+Deno.test('personel numarasi: komut asistaninin cevabi doner, musteri asistani calismaz', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(input, deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: true, reply: 'Bugün 3 randevun var' } }, calls)))
+  assertEquals(r.reply, 'Bugün 3 randevun var')
+  assertEquals(calls.length, 1)
+  assertEquals(calls[0].headers['x-bot-secret'], 'gizli')
+  assertEquals(calls[0].body, { phone: input.from, message: input.message, phone_number_id: 'pn-1' })
+})
+
+Deno.test('bot susturulmus: bos cevap, OpenAI cagrilmaz', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    input,
+    deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: false }, 'chatbot-context': { ...context, bot_paused: true } }, calls)),
+  )
+  assertEquals(r.reply, '')
+  assert(!calls.some((c) => c.url.includes('openai')))
+})
+
+Deno.test('sohbet: OpenAI cevabi gider, mesaj ve cevap kaydedilir', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, message: 'Fön kaç para?' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': context,
+          openai: openaiText('Fön 250 TL.'),
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  assertEquals(r.reply, 'Fön 250 TL.')
+  const ai = calls.find((c) => c.url.includes('openai'))!
+  assertEquals(ai.headers.Authorization, 'Bearer sk-test')
+  assertEquals(ai.body.model, 'gpt-5-mini')
+  assertEquals(ai.body.reasoning_effort, 'low')
+  const msgs = ai.body.messages as { role: string; content: string }[]
+  assert(msgs[0].content.startsWith('Sen Güzel Salon işletmesinin WhatsApp/Instagram asistanısın.'))
+  assertEquals(msgs.at(-1), { role: 'user', content: 'Fön kaç para?' })
+  const log = calls.find((c) => c.url.endsWith('chatbot-log-message'))!
+  assertEquals(log.body, {
+    customer_phone: input.from,
+    phone_number_id: 'pn-1',
+    messages: [
+      { role: 'user', content: 'Fön kaç para?' },
+      { role: 'assistant', content: 'Fön 250 TL.' },
+    ],
+  })
+})
+
+Deno.test('randevu alma: book-appointment cagrilir, onay mesaji doner', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, message: '2026-11-03 14:00 fön, Ayşe Demir 05321112233' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': context,
+          openai: openaiTool('book_appointment', {
+            service_name: 'Fön',
+            date: '2026-11-03',
+            time: '14:00',
+            customer_full_name: 'Ayşe Demir',
+            customer_contact_phone: '05321112233',
+          }),
+          'book-appointment': {
+            status: 'booked',
+            appointment: { service_name: 'Fön', scheduled_at: '2026-11-03T11:00:00Z', employee_name: 'Elif Yılmaz' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  const book = calls.find((c) => c.url.endsWith('book-appointment'))!
+  assertEquals(book.body.phone_number_id, 'pn-1')
+  assertEquals(book.body.service_name, 'Fön')
+  assertEquals(book.body.scheduled_at, '2026-11-03T14:00:00+03:00')
+  assertEquals(book.body.source_note, 'WhatsApp asistanı')
+  assertEquals(book.headers['x-bot-secret'], 'gizli')
+  assert(r.reply.startsWith('Randevunuz oluşturuldu ✅\nFön - 3 Kasım 14:00 - Elif Yılmaz'), r.reply)
+})
+
+Deno.test('randevu iptali: cancel-appointment cagrilir', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, message: 'perşembeki fönü iptal edelim' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': context,
+          openai: openaiTool('cancel_appointment', { appointment_id: 'apt-1' }),
+          'cancel-appointment': {
+            status: 'cancelled',
+            appointment: { service_name: 'Fön', scheduled_at: '2026-10-23T11:00:00Z', employee_name: 'Elif Yılmaz' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  assertEquals(calls.find((c) => c.url.endsWith('cancel-appointment'))!.body, {
+    appointment_id: 'apt-1',
+    customer_phone: input.from,
+    phone_number_id: 'pn-1',
+  })
+  assertEquals(r.reply, 'Randevunuz iptal edildi ✅\nFön - 23 Ekim 14:00 - Elif Yılmaz')
+})
+
+Deno.test('saat degisikligi: reschedule-appointment cagrilir', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, message: 'perşembeki fönü 2026-10-24 16:00 yapalım' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': context,
+          openai: openaiTool('reschedule_appointment', { appointment_id: 'apt-1', new_date: '2026-10-24', new_time: '16:00' }),
+          'reschedule-appointment': {
+            status: 'rescheduled',
+            appointment: { service_name: 'Fön', scheduled_at: '2026-10-24T13:00:00Z', employee_name: 'Elif Yılmaz' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  const req = calls.find((c) => c.url.endsWith('reschedule-appointment'))!
+  assertEquals(req.body.appointment_id, 'apt-1')
+  assertEquals(req.body.new_scheduled_at, '2026-10-24T16:00:00+03:00')
+  assertEquals(r.reply, 'Randevunuz güncellendi ✅\nFön - 24 Ekim 16:00 - Elif Yılmaz')
+})
+
+Deno.test('az once alinmis randevuya "evet": tekrar randevu acilmaz', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, message: 'evet' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': {
+            ...context,
+            history: [{ role: 'assistant', content: 'Randevunuz oluşturuldu ✅\nFön - 3 Kasım 14:00' }],
+          },
+          openai: openaiTool('book_appointment', {
+            service_name: 'Fön',
+            date: '2026-11-03',
+            time: '14:00',
+            customer_full_name: 'Ayşe Demir',
+            customer_contact_phone: '05321112233',
+          }),
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  assert(!calls.some((c) => c.url.endsWith('book-appointment')))
+  assertEquals(r.reply, 'Randevunuz zaten oluşturuldu, tekrar almanıza gerek yok. Başka bir konuda yardımcı olabilir miyim?')
+})
+
+Deno.test('OpenAI hatasi: hata firlar (webhook musteriye bir sey gondermez)', async () => {
+  const f = (async (url: string | URL) => {
+    const u = String(url)
+    if (u.includes('openai')) return new Response('{}', { status: 500 })
+    if (u.endsWith('staff-whatsapp-webhook')) return new Response(JSON.stringify({ handled: false }))
+    return new Response(JSON.stringify(context))
+  }) as typeof fetch
+  let threw = false
+  try {
+    await runChatbot(input, deps(f))
+  } catch {
+    threw = true
+  }
+  assert(threw)
+})
