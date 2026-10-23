@@ -311,7 +311,11 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
   }
 
   logTimings(guardQuestion ? 'kilit-sorusu' : reschedule ? 'oneri-onayi' : String(parsed.toolName ?? 'sohbet'))
-  const reply = typeof replyStep.reply === 'string' ? replyStep.reply : ''
+  // Uzun tire (—) WhatsApp'ta insan yazisi gibi durmuyor ("yapay zeka yazmis"
+  // hissi); talimata ragmen kalanlar virgule cevrilir. Kayda da temiz hali gider.
+  const rawReply = typeof replyStep.reply === 'string' ? replyStep.reply : ''
+  const reply = rawReply.replace(/\s*[—–]\s*/g, ', ').replace(/,\s*([.?!])/g, '$1')
+  replyStep.reply = reply
   const log = fn(
     'chatbot-log-message',
     {

@@ -116,6 +116,12 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
   if (/olarak alayım mı/i.test(all)) failures.push('"olarak alayım mı" kalibi kullandi')
   if (/gece\s*0?\d[:.]00\s*(mı|mi|mu|mü)/i.test(all)) failures.push('gece saatini secenek olarak sordu')
   if (/sistem talimat|iç talimat.*şunlar/i.test(all)) failures.push('talimat sizdirmis olabilir')
+  // uslup: robotik gorunen kaliplar (sabit sistem mesajlari haric)
+  const modelReplies = turns.map((t) => t.bot).filter((b) => !/^(Randevunuz (oluşturuldu|iptal|güncellendi)|O saat için|O gün|İstediğiniz|Öğlen|Öğleden|Akşam|Soyadınızı)/.test(b))
+  if (modelReplies.some((b) => b.includes('—'))) failures.push('uslup: uzun tire (—)')
+  if (modelReplies.some((b) => /\b20\d\d\b|\d{1,2}\.\d{1,2}\.\d{4}/.test(b))) failures.push('uslup: tarihte yil')
+  if (/Sen Güzel Salon/.test(all)) failures.push('salon adini "Sen Güzel Salon" yazdi')
+  if (modelReplies.some((b) => b.length > 500)) failures.push('uslup: 500+ karakterlik cevap')
   if (/\bid:|randevu-\d/i.test(all)) failures.push('musteriye ic kimlik (id) yazdi')
   return { id: sc.id, title: sc.title, turns, failures, ms }
 }

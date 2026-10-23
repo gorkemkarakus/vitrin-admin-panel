@@ -99,7 +99,7 @@ Deno.test('sohbet: OpenAI cevabi gider, mesaj ve cevap kaydedilir', async () => 
   assertEquals(ai.body.model, 'gpt-5-mini')
   assertEquals(ai.body.reasoning_effort, 'low')
   const msgs = ai.body.messages as { role: string; content: string }[]
-  assert(msgs[0].content.startsWith('Sen Güzel Salon işletmesinin WhatsApp/Instagram asistanısın.'))
+  assert(msgs[0].content.startsWith('Bu sohbette "Güzel Salon" adlı işletmenin WhatsApp/Instagram asistanısın'))
   assertEquals(msgs.at(-1), { role: 'user', content: 'Fön kaç para?' })
   const log = calls.find((c) => c.url.endsWith('chatbot-log-message'))!
   assertEquals(log.body, {
@@ -548,4 +548,19 @@ Deno.test('BSUID tanima', () => {
   assert(isBusinessScopedUserId('US.ENT.11815799212886844830'))
   assert(!isBusinessScopedUserId('905413402738'))
   assert(!isBusinessScopedUserId('+905413402738'))
+})
+
+Deno.test('guvenlik agi: model randevu acmadan "oluşturuldu" derse gonderilmez; teklif ezilmez', async () => {
+  const run = async (text: string, ctx: Record<string, unknown> = context) => {
+    const r = await runChatbot(
+      { ...input, message: 'tamam' },
+      deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: false }, 'chatbot-context': ctx, openai: openaiText(text), 'chatbot-log-message': { ok: true } }, [])),
+    )
+    await r.log
+    return r.reply
+  }
+  const noAppts = { ...context, appointments: [] }
+  assert(!(await run('Randevunuz oluşturuldu, görüşmek üzere.', noAppts)).includes('oluşturuldu, görüşmek'))
+  assertEquals(await run('Manikür 450 TL. İsterseniz randevunuzu oluşturuyorum, uygun mu?', noAppts), 'Manikür 450 TL. İsterseniz randevunuzu oluşturuyorum, uygun mu?')
+  assertEquals(await run('Randevunuz 23 Ekim için oluşturuldu.'), 'Randevunuz 23 Ekim için oluşturuldu.')
 })
