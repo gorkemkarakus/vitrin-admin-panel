@@ -9,6 +9,10 @@ import { resolveBusiness } from '../_shared/resolveBusiness.ts'
 // ad/telefon "unutuldu"). Limit genisletilerek bu risk pratikte ortadan
 // kaldirildi.
 const HISTORY_LIMIT = 60
+// Bot yalnizca son 24 saatin konusmasini hatirlar: gunler onceki bir sohbet
+// yeni talebi karistirmasin. Musterinin adi/telefonu customers kaydinda
+// kaldigi icin ertesi gun tekrar sorulmaz.
+const HISTORY_WINDOW_HOURS = 24
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -53,6 +57,7 @@ Deno.serve(async (req) => {
       .select('role, content, created_at')
       .eq('business_id', business.id)
       .eq('customer_phone', customer_phone)
+      .gte('created_at', new Date(Date.now() - HISTORY_WINDOW_HOURS * 3600000).toISOString())
       .order('created_at', { ascending: false })
       .limit(HISTORY_LIMIT),
     admin.from('profiles').select('id, full_name, gender').eq('business_id', business.id).eq('is_active', true),

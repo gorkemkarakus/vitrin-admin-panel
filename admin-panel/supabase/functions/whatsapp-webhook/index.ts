@@ -255,6 +255,26 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
     return
   }
 
+  // Test komutu "#sıfırla": bu numaranin bot sohbet gecmisini siler, sonraki
+  // mesaj yeni bir konusma gibi baslar. Yalnizca BOT_TEST_RESET=1 iken calisir
+  // (canlida kapali; gercek musterinin gecmisi silinmesin).
+  if (Deno.env.get('BOT_TEST_RESET') === '1' && /^#s[ıi]f[ıi]rla$/i.test(text.trim())) {
+    const { error: resetErr } = await admin
+      .from('chatbot_messages')
+      .delete()
+      .eq('business_id', business.id)
+      .eq('customer_phone', message.from)
+    if (resetErr) console.error('whatsapp-webhook: sohbet sıfırlanamadı:', resetErr.message)
+    if (phoneNumberId) {
+      await sendWhatsAppText({
+        phoneNumberId,
+        to: message.from,
+        message: resetErr ? 'Sohbet sıfırlanamadı.' : 'Sohbet sıfırlandı (test). Yeni bir konuşma gibi yazabilirsiniz.',
+      })
+    }
+    return
+  }
+
   const botPayload: N8nForwardPayload = {
     business_id: business.id,
     phone_number_id: phoneNumberId,
