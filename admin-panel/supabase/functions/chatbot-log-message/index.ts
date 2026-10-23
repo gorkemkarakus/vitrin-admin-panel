@@ -30,11 +30,17 @@ Deno.serve(async (req) => {
     return json({ error: 'customer_phone ve messages zorunlu' }, 400)
   }
 
-  const rows = messages.map((m) => ({
+  // Ayni istekte gelen mesajlar (musteri mesaji + asistan cevabi) ayni anda
+  // yaziliyordu; created_at esit olunca gecmis sorgusunda sira rastgele
+  // geliyor, cevap kendi sorusundan once gorunebiliyordu. Her satira 1 ms
+  // arayla artan zaman verilir, sira korunur.
+  const base = Date.now()
+  const rows = messages.map((m, i) => ({
     business_id: business.id,
     customer_phone,
     role: m.role,
     content: m.content,
+    created_at: new Date(base + i).toISOString(),
   }))
 
   const { error: insertErr } = await admin.from('chatbot_messages').insert(rows)

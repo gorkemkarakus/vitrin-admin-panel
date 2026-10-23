@@ -331,6 +331,23 @@ Deno.serve(async (req) => {
     }))
   }
 
+  // Salonun telefonu (aydinlatma metni ayarindaki iletisim telefonu) ve
+  // onumuzdeki 60 gunun kapali gunleri. Bot telefon yerine yer tutucu
+  // ("0555 XXX XX XX") veriyordu ve tatil gununu (ör. 29 Ekim) kendisi
+  // onerebiliyordu; ikisi de canli testte goruldu.
+  const todayIst = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const horizon = new Date(Date.now() + (3 * 60 + 60 * 24 * 60) * 60 * 1000).toISOString().slice(0, 10)
+  const [{ data: notice }, { data: holidays }] = await Promise.all([
+    admin.from('business_privacy_notices').select('contact_phone').eq('business_id', business.id).maybeSingle(),
+    admin
+      .from('business_holidays')
+      .select('name, start_date, end_date, eve_closes_at')
+      .eq('business_id', business.id)
+      .gte('end_date', todayIst)
+      .lte('start_date', horizon)
+      .order('start_date'),
+  ])
+
   const persistedName = customer?.full_name && customer.full_name !== 'Müşteri' ? customer.full_name : null
   const persistedPhone = customer?.contact_phone ?? null
   // Personel WhatsApp Coexistence uzerinden telefon uygulamasindan elle
@@ -355,6 +372,13 @@ Deno.serve(async (req) => {
       })),
       employees,
       working_hours: workingHours,
+      business_phone: notice?.contact_phone ?? null,
+      closed_days: (holidays ?? []).map((h) => ({
+        name: h.name,
+        start_date: h.start_date,
+        end_date: h.end_date,
+        eve_closes_at: h.eve_closes_at ? String(h.eve_closes_at).slice(0, 5) : null,
+      })),
       appointments,
       history: (history ?? []).reverse().map((h) => ({ role: h.role, content: h.content })),
     },

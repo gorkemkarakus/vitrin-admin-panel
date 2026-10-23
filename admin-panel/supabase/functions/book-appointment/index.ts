@@ -287,6 +287,18 @@ Deno.serve(async (req) => {
     return appointment
   }
 
+  // Istenen gun salonun tatili mi? (Tatiller musaitlikte calisanlara "Resmi
+  // Tatil" blogu olarak yaziliyor; sadece o bloga bakinca cevap "dolu" oluyordu.)
+  const requestedDate = istanbulDateString(requestedStart)
+  const { data: holidayRows } = await admin
+    .from('business_holidays')
+    .select('name')
+    .eq('business_id', business.id)
+    .lte('start_date', requestedDate)
+    .gte('end_date', requestedDate)
+    .limit(1)
+  const closedDay = holidayRows?.[0] ? { name: holidayRows[0].name as string } : null
+
   // Istenen saat doluysa (ya da asagida rezervasyon aninda yarisdan kaybedilirse):
   // ileri dogru en yakin musait slotu ara (rezervasyon YAPMADAN oner). "from"
   // her iki cagri yerinde de MUSTERININ ASIL istedigi saat (requestedStart) —
@@ -325,7 +337,8 @@ Deno.serve(async (req) => {
           {
             status: 'unavailable',
             suggestion: { scheduled_at: t.toISOString(), employee_name: profileName(found) },
-            outside_hours: outsideHours,
+            outside_hours: closedDay ? null : outsideHours,
+            closed_day: closedDay,
           },
           200,
         )

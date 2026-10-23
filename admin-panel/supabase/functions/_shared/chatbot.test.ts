@@ -3,6 +3,7 @@
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
 import { earlyHourQuestionText, runChatbot, type ChatbotInput } from './chatbot.ts'
+import { isConfirmationMessage } from './chatbotFlow.js'
 
 const BASE = 'https://ornek.supabase.co'
 const input: ChatbotInput = {
@@ -312,4 +313,155 @@ Deno.test('saat sorusu gunun bolumune gore dogal kurulur', () => {
   assertEquals(earlyHourQuestionText(4, '00'), 'Öğleden sonra 4, yani 16:00 uygun mu?')
   assertEquals(earlyHourQuestionText(7, '00'), 'Akşam 7, yani 19:00 uygun mu?')
   assertEquals(earlyHourQuestionText(2, '30'), 'Öğlen 2:30, yani 14:30 uygun mu?')
+})
+
+// --- 2026-10-23 canli testte gorulen hatalar ---
+
+Deno.test('onay cumleleri: gundelik onaylar sayilir, olumsuz/yeni saat sayilmaz', () => {
+  for (const ok of ['Uygun', 'evet', 'Tamam aynı tarihi söylüyorsun zaten uygun', 'olur o zaman', 'tamamdır ayarla']) {
+    assert(isConfirmationMessage(ok), ok)
+  }
+  for (const no of ['uygun değil', 'hayır olmaz', 'olur ama 10da', 'başka gün olsun', 'iptal et', 'pedikür kaç para']) {
+    assert(!isConfirmationMessage(no), no)
+  }
+})
+
+const pedicureContext = {
+  ...context,
+  services: [{ name: 'Pedikür', duration_minutes: 60, price: 500 }],
+  history: [
+    { role: 'user', content: '29 ekim pedikür istiyorum sabah' },
+    { role: 'assistant', content: 'Ad soyad ve telefonunuzu yazar mısınız?' },
+    { role: 'user', content: 'Görkem Karakuş 05413402738' },
+    { role: 'assistant', content: 'Tamam, ad ve telefon kayıtlı. 30 Ekim 09:00 sizin için uygun mu?' },
+  ],
+}
+const bookPedicure = openaiTool('book_appointment', {
+  service_name: 'Pedikür',
+  date: '2026-10-29',
+  time: '09:00',
+  customer_full_name: 'Görkem Karakuş',
+  customer_contact_phone: '05413402738',
+})
+
+Deno.test('botun kendi onerdigi tarih onaylaninca eski tarih (29 Ekim) degil 30 Ekim denenir', async () => {
+  const calls: Call[] = []
+  await runChatbot(
+    { ...input, message: 'Uygun' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': pedicureContext,
+          openai: bookPedicure,
+          'book-appointment': {
+            status: 'booked',
+            appointment: { service_name: 'Pedikür', scheduled_at: '2026-10-30T06:00:00Z', employee_name: 'Elif Yılmaz' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  const book = calls.find((c) => c.url.endsWith('book-appointment'))!
+  assertEquals(book.body.scheduled_at, '2026-10-30T09:00:00+03:00')
+})
+
+Deno.test('"tamam ayni tarihi soyluyorsun zaten uygun" sabit kalipli oneriyi onaylar', async () => {
+  const calls: Call[] = []
+  await runChatbot(
+    { ...input, message: 'Tamam aynı tarihi söylüyorsun zaten uygun' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': {
+            ...pedicureContext,
+            history: [
+              ...pedicureContext.history,
+              { role: 'user', content: 'Uygun' },
+              {
+                role: 'assistant',
+                content: 'O saat için uygun değiliz (dolu). En yakın uygun saat: 30 Ekim 09:00 - Salon Çalışanı. Uygun mu?',
+              },
+            ],
+          },
+          openai: bookPedicure,
+          'book-appointment': {
+            status: 'booked',
+            appointment: { service_name: 'Pedikür', scheduled_at: '2026-10-30T06:00:00Z', employee_name: 'Salon Çalışanı' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  const book = calls.find((c) => c.url.endsWith('book-appointment'))!
+  assertEquals(book.body.scheduled_at, '2026-10-30T09:00:00+03:00')
+  assertEquals(book.body.employee_name, 'Salon Çalışanı')
+})
+
+Deno.test('tatil gunu: "dolu" yerine "kapaliyiz" denir', async () => {
+  const r = await runChatbot(
+    { ...input, message: '29 ekim saat 10:00 pedikür, Görkem Karakuş 05413402738' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': { ...context, services: [{ name: 'Pedikür', duration_minutes: 60, price: 500 }] },
+          openai: openaiTool('book_appointment', {
+            service_name: 'Pedikür',
+            date: '2026-10-29',
+            time: '10:00',
+            customer_full_name: 'Görkem Karakuş',
+            customer_contact_phone: '05413402738',
+          }),
+          'book-appointment': {
+            status: 'unavailable',
+            suggestion: { scheduled_at: '2026-10-30T06:00:00Z', employee_name: 'Elif Yılmaz' },
+            outside_hours: null,
+            closed_day: { name: 'Cumhuriyet Bayramı' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        [],
+      ),
+    ),
+  )
+  assert(r.reply.startsWith('O gün (Cumhuriyet Bayramı) kapalıyız. En yakın uygun saat: 30 Ekim 09:00'), r.reply)
+})
+
+Deno.test('talimat: yer tutucu numara yok; salon telefonu ve kapali gunler eklenir', async () => {
+  const promptFor = async (ctx: Record<string, unknown>) => {
+    const calls: Call[] = []
+    await runChatbot(
+      input,
+      deps(
+        fakeFetch(
+          {
+            'staff-whatsapp-webhook': { handled: false },
+            'chatbot-context': ctx,
+            openai: openaiText('ok'),
+            'chatbot-log-message': { ok: true },
+          },
+          calls,
+        ),
+      ),
+    )
+    const ai = calls.find((c) => c.url.includes('openai'))!
+    return (ai.body.messages as { content: string }[])[0].content
+  }
+  const withPhone = await promptFor({
+    ...context,
+    business_phone: '0362 555 12 34',
+    closed_days: [{ name: 'Cumhuriyet Bayramı', start_date: '2026-10-29', end_date: '2026-10-29', eve_closes_at: '13:00' }],
+  })
+  assert(!withPhone.includes('XXX'))
+  assert(withPhone.includes("'0362 555 12 34'"))
+  assert(withPhone.includes('29 Ekim (Perşembe): Cumhuriyet Bayramı'))
+  const noPhone = await promptFor(context)
+  assert(!noPhone.includes('XXX'))
+  assert(noPhone.includes('müşteriye ASLA bir numara yazma'))
 })
