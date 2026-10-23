@@ -222,10 +222,19 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
     fn('chatbot-context', { customer_phone: input.from, phone_number_id: input.phone_number_id }, 15000),
   )
   contextPromise.catch(() => {}) // personel dalinda beklenmezse yakalanmamis hata olmasin
-  const staff = await timed(
-    'personel',
-    fn('staff-whatsapp-webhook', { phone: input.from, message: input.message, phone_number_id: input.phone_number_id }, 15000),
-  )
+  // Personel telefon numarasiyla taninir: kimlik telefon degilse (kullanici
+  // adli kisi, "TR.1824...") personel kontrolu yapilmaz. Personel kontrolu
+  // hata verirse de (ör. 400) musteri asistani susmasin, musteri sayilir.
+  const isPhone = /^\+?\d{8,15}$/.test(input.from)
+  const staff: Json = isPhone
+    ? await timed(
+        'personel',
+        fn('staff-whatsapp-webhook', { phone: input.from, message: input.message, phone_number_id: input.phone_number_id }, 15000, true),
+      ).catch((e) => {
+        console.error('chatbot: personel kontrolü başarısız, müşteri sayılıyor:', e instanceof Error ? e.message : e)
+        return {}
+      })
+    : {}
   if (staff.handled === true) {
     logTimings('personel')
     return { reply: typeof staff.reply === 'string' ? staff.reply : '', log: noLog }

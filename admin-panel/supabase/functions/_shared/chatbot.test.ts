@@ -4,6 +4,7 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1'
 import { askForSurname, earlyHourQuestionText, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
 import { isConfirmationMessage } from './chatbotFlow.js'
+import { isBusinessScopedUserId } from './notify.ts'
 
 const BASE = 'https://ornek.supabase.co'
 const input: ChatbotInput = {
@@ -513,4 +514,38 @@ Deno.test('ad karisikligi yakalanir: musterinin adi "calismiyor" denirse', () =>
   assertEquals(misreadCustomerName(chat('Ahmet bizde çalışmıyor.'), 'ahmet beyle yarın 10 saç kesimi, can er 0532'), null)
   assertEquals(misreadCustomerName(chat('Elif Demir salonumuzda çalışmıyor.'), 'pazartesi 13.30 fön Elif Demir 05321234567'), 'Elif Demir')
   assertEquals(misreadCustomerName(chat('Merve Ak salonumuzda çalışmıyor'), 'yarın fön'), null)
+})
+
+// --- WhatsApp kullanici adi (BSUID) ile gelen mesajlar ---
+
+Deno.test('BSUID ile gelen musteri: personel kontrolu atlanir, bot cevap verir', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, from: 'TR.1824962542022888', message: 'fön kaç para' },
+    deps(fakeFetch({ 'chatbot-context': context, openai: openaiText('Fön 250 TL.'), 'chatbot-log-message': { ok: true } }, calls)),
+  )
+  await r.log
+  assertEquals(r.reply, 'Fön 250 TL.')
+  assert(!calls.some((c) => c.url.endsWith('staff-whatsapp-webhook')))
+  assertEquals(calls.find((c) => c.url.endsWith('chatbot-context'))!.body.customer_phone, 'TR.1824962542022888')
+})
+
+Deno.test('personel kontrolu 400 verirse bot susmaz, musteri sayilir', async () => {
+  const f = (async (url: string | URL) => {
+    const u = String(url)
+    if (u.endsWith('staff-whatsapp-webhook')) return new Response(JSON.stringify({ error: 'phone ve message zorunlu' }), { status: 400 })
+    if (u.endsWith('chatbot-context')) return new Response(JSON.stringify(context))
+    if (u.includes('openai')) return new Response(JSON.stringify(openaiText('Merhaba!')))
+    return new Response(JSON.stringify({ ok: true }))
+  }) as typeof fetch
+  const r = await runChatbot(input, deps(f))
+  await r.log
+  assertEquals(r.reply, 'Merhaba!')
+})
+
+Deno.test('BSUID tanima', () => {
+  assert(isBusinessScopedUserId('TR.1824962542022888'))
+  assert(isBusinessScopedUserId('US.ENT.11815799212886844830'))
+  assert(!isBusinessScopedUserId('905413402738'))
+  assert(!isBusinessScopedUserId('+905413402738'))
 })

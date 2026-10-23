@@ -25,7 +25,11 @@ import { sendTypingIndicator, sendWhatsAppText } from '../_shared/notify.ts'
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
 interface WhatsAppMessage {
-  from: string
+  // Telefon numarasi. WhatsApp kullanici adi kullanan ve numarasini gizleyen
+  // kisilerde HIC gelmeyebilir; o zaman kimlik from_user_id'dedir (BSUID,
+  // "TR.1824..." gibi, isletmeye ozel).
+  from?: string
+  from_user_id?: string
   id: string
   type: string
   text?: { body: string }
@@ -224,6 +228,13 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   }
 
   const wamid = message.id
+  // Musteri kimligi: telefon varsa telefon, yoksa isletmeye ozel kullanici
+  // kimligi (BSUID). Cevap da ayni kimlige gider (notify.ts BSUID'i taniyor).
+  const sender = message.from ?? message.from_user_id ?? ''
+  if (!sender) {
+    console.error('whatsapp-webhook: gönderen kimliği yok (from / from_user_id), atlanıyor:', wamid)
+    return
+  }
 
   // Insert'in PRIMARY KEY ihlaliyle basarisiz olmasi "bu wamid zaten
   // islendi" sinyali — check-then-insert yerine atomik, yaris durumuna
@@ -259,12 +270,12 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
 
   // "RET": kampanya izni kapatilir, asistana iletilmez.
   if (isOptOutMessage(text)) {
-    const { error: optErr } = await admin.rpc('opt_out_customer_by_phone', { p_business: business.id, p_phone: message.from })
+    const { error: optErr } = await admin.rpc('opt_out_customer_by_phone', { p_business: business.id, p_phone: sender })
     if (optErr) console.error('whatsapp-webhook: ret kaydedilemedi:', optErr.message)
     if (phoneNumberId) {
       await sendWhatsAppText({
         phoneNumberId,
-        to: message.from,
+        to: sender,
         message: 'Kampanya mesajı listesinden çıkarıldınız. Randevu hatırlatmalarınız gelmeye devam edecek.',
       })
     }
@@ -279,12 +290,12 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
       .from('chatbot_messages')
       .delete()
       .eq('business_id', business.id)
-      .eq('customer_phone', message.from)
+      .eq('customer_phone', sender)
     if (resetErr) console.error('whatsapp-webhook: sohbet sıfırlanamadı:', resetErr.message)
     if (phoneNumberId) {
       await sendWhatsAppText({
         phoneNumberId,
-        to: message.from,
+        to: sender,
         message: resetErr ? 'Sohbet sıfırlanamadı.' : 'Sohbet sıfırlandı (test). Yeni bir konuşma gibi yazabilirsiniz.',
       })
     }
@@ -294,7 +305,7 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   const botPayload: N8nForwardPayload = {
     business_id: business.id,
     phone_number_id: phoneNumberId,
-    from: message.from,
+    from: sender,
     customer_name: customerName,
     message: text,
     wamid,

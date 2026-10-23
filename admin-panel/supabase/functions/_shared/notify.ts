@@ -27,6 +27,12 @@ function toWhatsAppPhone(raw: string): string {
 // "Log Messages" adimiyla chatbot_messages'a yaziliyor — o yuzden whatsapp-
 // webhook bu ham fonksiyonu DOGRUDAN cagiriyor, sendCustomerMessage'i degil,
 // aksi halde ayni asistan cevabi chatbot_messages'a IKI KEZ yazilirdi.
+// Isletmeye ozel WhatsApp kullanici kimligi (BSUID): iki harf ulke kodu +
+// nokta + harf/rakam, ör. "TR.1824962542022888" (bayi kimligi "US.ENT....").
+export function isBusinessScopedUserId(id: string): boolean {
+  return /^[A-Z]{2}\.[A-Za-z0-9.]+$/.test(id)
+}
+
 export async function sendWhatsAppText(params: {
   phoneNumberId: string
   to: string
@@ -44,7 +50,11 @@ export async function sendWhatsAppText(params: {
       },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
-        to: params.to,
+        recipient_type: 'individual',
+        // Telefon numarasi "to"ya, isletmeye ozel kullanici kimligi (BSUID,
+        // "TR.1824..." gibi; numarasini gizleyen kullanici adli kisiler)
+        // "recipient"a yazilir (Meta Cloud API).
+        ...(isBusinessScopedUserId(params.to) ? { recipient: params.to } : { to: params.to }),
         type: 'text',
         text: { body: params.message },
       }),
