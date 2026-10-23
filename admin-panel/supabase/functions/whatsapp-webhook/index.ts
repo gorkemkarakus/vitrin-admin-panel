@@ -19,6 +19,11 @@ interface WhatsAppValue {
   metadata?: { phone_number_id?: string }
   messages?: WhatsAppMessage[]
   contacts?: { profile?: { name?: string } }[]
+  statuses?: {
+    id?: string
+    status?: string
+    errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[]
+  }[]
 }
 
 interface WhatsAppPayload {
@@ -179,6 +184,20 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
 
   const value = payload.entry?.[0]?.changes?.[0]?.value
   const message = value?.messages?.[0]
+
+  // Gonderilen cevabin teslim durumu (sent/delivered/read/failed). Meta
+  // gonderimi kabul edip sonra teslim edemezse hata yalnizca burada gelir;
+  // loglanmazsa cevap sessizce kaybolur. Alici numarasi yazilmaz.
+  for (const s of value?.statuses ?? []) {
+    if (s.status === 'failed') {
+      console.error('whatsapp-webhook: mesaj teslim edilemedi', {
+        message_id: s.id,
+        errors: (s.errors ?? []).map((e) => ({ code: e.code, title: e.title, details: e.error_data?.details ?? e.message })),
+      })
+    } else {
+      console.log('whatsapp-webhook: teslim durumu', { message_id: s.id, status: s.status })
+    }
+  }
 
   // messages dizisi bos olabilir (durum guncellemesi — delivered/read/sent
   // gibi) ya da metin disi bir tip (image/audio/location/...) gelebilir;
