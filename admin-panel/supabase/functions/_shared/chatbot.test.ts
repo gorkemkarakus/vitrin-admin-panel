@@ -2,7 +2,7 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { earlyHourQuestionText, runChatbot, type ChatbotInput } from './chatbot.ts'
+import { askForSurname, earlyHourQuestionText, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
 import { isConfirmationMessage } from './chatbotFlow.js'
 
 const BASE = 'https://ornek.supabase.co'
@@ -491,4 +491,26 @@ Deno.test('dogrudan cagri: bot fonksiyonlari aga cikmadan isleyicilere gider, Op
   assertEquals(viaNetwork.length, 1)
   assert(viaNetwork[0].includes('api.openai.com'))
   assertEquals(viaHandler.sort(), ['context', 'log', 'staff'])
+})
+
+Deno.test('soyad kilidi: tek kelimelik adla randevu acilmaz; soyad sonradan gelince birlestirilir', () => {
+  const book = (name: string) => ({ hasToolCall: true, toolName: 'book_appointment', toolArgs: { customer_full_name: name } })
+  assertEquals(askForSurname(book('Zeynep'), 'yarın 10 manikür adım zeynep 0532', context), 'Soyadınızı da yazar mısınız?')
+  const a = book('Ali')
+  assertEquals(askForSurname(a, 'ali yılmaz 05321115050', context), null)
+  assertEquals((a.toolArgs as { customer_full_name: string }).customer_full_name, 'Ali Yılmaz')
+  const b = book('Zeynep')
+  const ctx = { ...context, history: [{ role: 'assistant', content: 'Soyadınızı da yazar mısınız?' }] }
+  assertEquals(askForSurname(b, 'arslan', ctx), null)
+  assertEquals((b.toolArgs as { customer_full_name: string }).customer_full_name, 'Zeynep Arslan')
+  assertEquals(askForSurname(book('Ali'), 'ali için yarın 10', context), 'Soyadınızı da yazar mısınız?')
+  assertEquals(askForSurname(book('Ayşe Demir'), 'x', context), null)
+})
+
+Deno.test('ad karisikligi yakalanir: musterinin adi "calismiyor" denirse', () => {
+  const chat = (r: string) => ({ hasToolCall: false, chatReply: r })
+  assertEquals(misreadCustomerName(chat('Hande Özkan salonumuzda çalışmıyor maalesef.'), 'haftaya salı 10:00 manikür, hande özkan 0532'), 'Hande Özkan')
+  assertEquals(misreadCustomerName(chat('Ahmet bizde çalışmıyor.'), 'ahmet beyle yarın 10 saç kesimi, can er 0532'), null)
+  assertEquals(misreadCustomerName(chat('Elif Demir salonumuzda çalışmıyor.'), 'pazartesi 13.30 fön Elif Demir 05321234567'), 'Elif Demir')
+  assertEquals(misreadCustomerName(chat('Merve Ak salonumuzda çalışmıyor'), 'yarın fön'), null)
 })

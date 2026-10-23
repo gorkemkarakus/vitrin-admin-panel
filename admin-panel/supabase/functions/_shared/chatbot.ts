@@ -87,6 +87,84 @@ export function askAboutEarlyHour(parsed: Json, message: string, context: Json):
   return earlyHourQuestionText(hour, m[2])
 }
 
+// Randevuyu ad soyadla acariz: model bazen yalniz adla ("adım zeynep")
+// book_appointment cagirabiliyor. Tek kelimelik adla randevu acilmaz.
+// adin hemen arkasindan gelip soyad olmayan yaygin kelimeler
+const NOT_SURNAMES = new Set([
+  'için', 'icin', 'ile', 've', 'de', 'da', 'bey', 'hanım', 'hanim', 'olsun', 'yarın', 'yarin', 'bugün', 'bugun',
+  'saat', 'adım', 'adim', 'benim', 'ben', 'numara', 'numaram', 'telefon', 'tel', 'randevu', 'lütfen', 'lutfen',
+  'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi', 'pazar', 'öğlen', 'sabah', 'akşam',
+])
+
+// Musteri soyadini yazdiysa (mesajinda adin yaninda bir kelime daha var ya da
+// "Soyadınızı da yazar mısınız?" sorusuna tek kelimeyle cevap verdi) tam ad
+// burada birlestirilir ve toolArgs'a yazilir; yoksa soru doner.
+// (Hatirlanan tek kelimelik ad modeli surekli ona dondurup sonsuz soru
+// dongusune sokuyordu; testte goruldu.)
+export function askForSurname(parsed: Json, message: string, context: Json): string | null {
+  if (parsed.toolName !== 'book_appointment') return null
+  const args = (parsed.toolArgs ?? {}) as Record<string, unknown>
+  const name = String(args.customer_full_name || context.detected_full_name || '').trim()
+  if (!name || name.split(/\s+/).length >= 2) return null
+  const cap = (w: string) => w.charAt(0).toLocaleUpperCase('tr') + w.slice(1)
+  const history = Array.isArray(context.history) ? (context.history as { role?: string; content?: unknown }[]) : []
+  const userTexts = [message, ...history.filter((h) => h.role === 'user').map((h) => String(h.content ?? '')).reverse()]
+  const first = name.toLocaleLowerCase('tr')
+  for (const t of userTexts) {
+    const m = t.toLocaleLowerCase('tr').match(new RegExp(`(^|[^a-zçğıöşü])${first}\\s+([a-zçğıöşü]{2,})`))
+    if (m && !NOT_SURNAMES.has(m[2])) {
+      args.customer_full_name = `${cap(first)} ${cap(m[2])}`
+      return null
+    }
+  }
+  const lastAssistant = [...history].reverse().find((h) => h.role === 'assistant')
+  const reply = message.trim()
+  if (String(lastAssistant?.content ?? '').startsWith('Soyadınızı') && /^[A-Za-zÇĞİÖŞÜçğıöşü]{2,}$/.test(reply)) {
+    args.customer_full_name = `${cap(first)} ${cap(reply.toLocaleLowerCase('tr'))}`
+    return null
+  }
+  return 'Soyadınızı da yazar mısınız?'
+}
+
+// Model bazen musterinin kendi adini calisan sanip "X salonumuzda çalışmıyor"
+// diyor (testte ~3'te 1). X musterinin mesajinda geciyorsa model bir kez daha,
+// "X musterinin adidir" notuyla sorulur.
+export function misreadCustomerName(parsed: Json, message: string): string | null {
+  if (parsed.hasToolCall === true) return null
+  const reply = String(parsed.chatReply ?? '')
+  const m = reply.match(/["“]?([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)?)["”]?\s+(?:salonumuzda|bizde|burada|işletmemizde)\s+çalışmıyor/)
+  if (!m) return null
+  const name = m[1].toLocaleLowerCase('tr')
+  const text = message.toLocaleLowerCase('tr')
+  if (!text.includes(name)) return null
+  // "ahmet beyle", "selin hanım yapsın", "elif'le olsun": gercek calisan tercihi
+  const after = text.slice(text.indexOf(name) + name.length)
+  if (/^\s*('?\s*(le|la|ile|yle|yla)\b|\s*(bey|hanım|hanim|abla|abi)|\s+(yapsın|olsun|ile))/.test(after)) return null
+  return m[1]
+}
+
+const MONTHS = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık']
+
+// Saat degisikligi onerisi ("İstediğiniz yeni saat için uygun değiliz. En yakın
+// uygun saat: 24 Ekim 15:00 - Elif. Uygun mu?") onaylandiysa ve musterinin
+// tek aktif randevusu varsa, modele sormadan o randevu onerilen saate tasinir.
+// Model bu onayi yeni randevu sanip ad/telefon istiyordu (testte 3'te 2).
+export function confirmedReschedule(message: string, context: Json): { appointment_id: string; date: string; time: string } | null {
+  if (!flow.isConfirmationMessage(message)) return null
+  const history = Array.isArray(context.history) ? (context.history as { role?: string; content?: unknown }[]) : []
+  const last = [...history].reverse().find((h) => h.role === 'assistant')
+  const m = String(last?.content ?? '').match(
+    /İstediğiniz yeni saat için uygun değiliz\. En yakın uygun saat:\s*(\d{1,2})\s+([A-Za-zÇĞİÖŞÜçğıöşü]+)(?:\s+(\d{4}))?\s+(\d{2}:\d{2})/,
+  )
+  const appointments = Array.isArray(context.appointments) ? (context.appointments as { id?: string }[]) : []
+  if (!m || appointments.length !== 1 || !appointments[0].id) return null
+  const month = MONTHS.indexOf(m[2].toLocaleLowerCase('tr'))
+  if (month < 0) return null
+  const year = m[3] ? Number(m[3]) : new Date(Date.now() + 3 * 3600000).getUTCFullYear()
+  const date = new Date(Date.UTC(year, month, Number(m[1]))).toISOString().slice(0, 10)
+  return { appointment_id: appointments[0].id, date, time: m[4] }
+}
+
 // "Öğlen 1, yani 13:00 uygun mu?" — insanlarin konustugu gibi; saate ek
 // gerekmesin diye soru "uygun mu" ile biter.
 export function earlyHourQuestionText(hour: number, minute: string): string {
@@ -158,17 +236,49 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
   // Personel elle devraldiysa ya da numara bir isletmeye bagli degilse bot susar.
   if (context.bot_paused === true || !context.business_name) return { reply: '', log: noLog }
 
-  const openaiRequest = run('Build OpenAI Request', flow.buildOpenAIRequest as Step, context)
-  const openaiResponse = await timed(
-    'openai',
-    postJson(f, 'https://api.openai.com/v1/chat/completions', { Authorization: `Bearer ${deps.openaiKey}` }, openaiRequest, 30000, false),
-  )
-  const parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, openaiResponse)
-  const earlyHourQuestion = parsed.hasToolCall === true ? askAboutEarlyHour(parsed, input.message, context) : null
+  const reschedule = confirmedReschedule(input.message, context)
+  let parsed: Json
+  if (reschedule) {
+    parsed = {
+      hasToolCall: true,
+      toolName: 'reschedule_appointment',
+      toolArgs: { appointment_id: reschedule.appointment_id, new_date: reschedule.date, new_time: reschedule.time },
+    }
+    outputs['Parse OpenAI Response'] = parsed
+  } else {
+    const openaiRequest = run('Build OpenAI Request', flow.buildOpenAIRequest as Step, context)
+    const openaiResponse = await timed(
+      'openai',
+      postJson(f, 'https://api.openai.com/v1/chat/completions', { Authorization: `Bearer ${deps.openaiKey}` }, openaiRequest, 30000, false),
+    )
+    parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, openaiResponse)
+    const misread = misreadCustomerName(parsed, input.message)
+    if (misread) {
+      const retryRequest = {
+        ...openaiRequest,
+        messages: [
+          ...(openaiRequest.messages as unknown[]),
+          {
+            role: 'system',
+            content: `Düzeltme: "${misread}" müşterinin KENDİ adıdır, çalışan değildir. Çalışan tercihi belirtilmedi. Bu adı customer_full_name olarak kullan ve kurallara göre devam et; "çalışmıyor" deme.`,
+          },
+        ],
+      }
+      const retry = await timed(
+        'openai-tekrar',
+        postJson(f, 'https://api.openai.com/v1/chat/completions', { Authorization: `Bearer ${deps.openaiKey}` }, retryRequest, 30000, false),
+      )
+      parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, retry)
+    }
+  }
+  const guardQuestion =
+    parsed.hasToolCall === true
+      ? (askAboutEarlyHour(parsed, input.message, context) ?? askForSurname(parsed, input.message, context))
+      : null
 
   let replyStep: Json
-  if (earlyHourQuestion) {
-    replyStep = { reply: earlyHourQuestion, customer_phone: input.from, message: input.message }
+  if (guardQuestion) {
+    replyStep = { reply: guardQuestion, customer_phone: input.from, message: input.message }
   } else if (parsed.hasToolCall !== true) {
     replyStep = run('Build Reply From Chat', flow.buildReplyFromChat as Step, parsed)
   } else if (parsed.toolName === 'cancel_appointment') {
@@ -177,6 +287,12 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
     replyStep = run('Build Reply From Cancel', flow.buildReplyFromCancel as Step, result)
   } else if (parsed.toolName === 'reschedule_appointment') {
     const req = run('Build Reschedule Request', flow.buildRescheduleRequest as Step, parsed)
+    if (reschedule) {
+      // onaylanan oneri kesin: gecmisteki eski tarih/saat ifadeleri ezmesin
+      req.new_scheduled_at = `${reschedule.date}T${reschedule.time}:00+03:00`
+      req.date_warning = null
+      req.weekday_note = null
+    }
     const result = await timed('islem', fn('reschedule-appointment', req, 15000, true))
     replyStep = run('Build Reply From Reschedule', flow.buildReplyFromReschedule as Step, result)
   } else {
@@ -185,7 +301,7 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
     replyStep = run('Build Reply From Booking', flow.buildReplyFromBooking as Step, result)
   }
 
-  logTimings(earlyHourQuestion ? 'saat-sorusu' : String(parsed.toolName ?? 'sohbet'))
+  logTimings(guardQuestion ? 'kilit-sorusu' : reschedule ? 'oneri-onayi' : String(parsed.toolName ?? 'sohbet'))
   const reply = typeof replyStep.reply === 'string' ? replyStep.reply : ''
   const log = fn(
     'chatbot-log-message',

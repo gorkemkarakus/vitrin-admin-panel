@@ -18,7 +18,11 @@ if (!openaiKey) {
   Deno.exit(1)
 }
 
-const filter = Deno.args[0] ? new RegExp(Deno.args[0], 'i') : null
+// kullanim: run.ts [filtre] [--tekrar=3]
+const repeatArg = Deno.args.find((a) => a.startsWith('--tekrar='))
+const REPEAT = repeatArg ? Math.max(1, Number(repeatArg.split('=')[1]) || 1) : 1
+const filterArg = Deno.args.find((a) => !a.startsWith('--'))
+const filter = filterArg ? new RegExp(filterArg, 'i') : null
 const BASE = 'https://sahte.supabase.co'
 
 interface Result {
@@ -30,9 +34,24 @@ interface Result {
   error?: string
 }
 
+// chatbot-context'in gecmisten ad/telefon bulmasinin basit taklidi
+function detected(history: { role: string; content: string }[]) {
+  let phone: string | null = null
+  let name: string | null = null
+  for (const h of history) {
+    if (h.role !== 'user') continue
+    const p = [...h.content.matchAll(/(?:\+?90|0)?\s*5\d{2}\s*\d{3}\s*\d{2}\s*\d{2}/g)].pop()
+    if (p) phone = p[0].replace(/\D/g, '')
+    const n = h.content.match(/ad[ıi]m\s+([a-zçğıöşü]+(?:\s+[a-zçğıöşü]+)?)/i)
+    if (n) name = n[1]
+  }
+  return { detected_full_name: name, detected_contact_phone: phone }
+}
+
 async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise<Result> {
   const salon = new Salon(sc.busy ?? [])
-  const phone = `90555000${String(idx).padStart(4, '0')}`
+  const phone = `90555${String(idx).padStart(7, '0')}`
+  if (sc.mine) salon.seed(phone, sc.mine)
   const history: { role: string; content: string }[] = []
   const turns: Turn[] = []
   const ms: number[] = []
@@ -57,8 +76,8 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
           closed_days: [{ name: HOLIDAY.name, start_date: HOLIDAY.date, end_date: HOLIDAY.date, eve_closes_at: '13:00' }],
           appointments: salon.customerAppointments(phone),
           history: history.slice(-30),
-          detected_full_name: null,
-          detected_contact_phone: null,
+          // gercek chatbot-context gibi: onceki mesajlardaki telefon ve 'adım X' hatirlanir
+          ...detected(history),
         })
       case 'book-appointment':
         return ok(salon.book(body))
@@ -93,19 +112,23 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
   const failures = sc.check({ turns, booked, allBot: turns.map((t) => t.bot).join('\n') })
   // her senaryoda gecerli genel kurallar
   const all = turns.map((t) => t.bot).join('\n')
-  if (/XXX/.test(all)) failures.push('yer tutucu numara (XXX) verdi')
+  if (/XXX XX XX/.test(all)) failures.push('yer tutucu numara (XXX XX XX) verdi')
   if (/olarak alayım mı/i.test(all)) failures.push('"olarak alayım mı" kalibi kullandi')
   if (/gece\s*0?\d[:.]00\s*(mı|mi|mu|mü)/i.test(all)) failures.push('gece saatini secenek olarak sordu')
   if (/sistem talimat|iç talimat.*şunlar/i.test(all)) failures.push('talimat sizdirmis olabilir')
+  if (/\bid:|randevu-\d/i.test(all)) failures.push('musteriye ic kimlik (id) yazdi')
   return { id: sc.id, title: sc.title, turns, failures, ms }
 }
 
 const selected = SCENARIOS.filter((s) => !filter || filter.test(s.id) || filter.test(s.title))
-console.log(`${selected.length} senaryo calisiyor...`)
+// her senaryo REPEAT kez calisir: model her seferinde biraz farkli cevap
+// verdigi icin "bazen bozulan" davranis ancak tekrarla gorunur
+const jobs = selected.flatMap((s) => Array.from({ length: REPEAT }, () => s))
+console.log(`${selected.length} senaryo x ${REPEAT} = ${jobs.length} konusma calisiyor...`)
 const results: Result[] = []
-// 4'erli paralel: hizli ama OpenAI sinirlarina takilmadan
-for (let i = 0; i < selected.length; i += 4) {
-  const batch = await Promise.all(selected.slice(i, i + 4).map((s, j) => runScenario(s, i + j)))
+const PARALLEL = 6
+for (let i = 0; i < jobs.length; i += PARALLEL) {
+  const batch = await Promise.all(jobs.slice(i, i + PARALLEL).map((s, j) => runScenario(s, i + j)))
   for (const r of batch) {
     results.push(r)
     console.log(`${r.failures.length ? '✗' : '✓'} ${r.id} ${r.title}${r.failures.length ? '  -> ' + r.failures.join('; ') : ''}`)
@@ -116,6 +139,18 @@ const passed = results.filter((r) => !r.failures.length).length
 const allMs = results.flatMap((r) => r.ms).sort((a, b) => a - b)
 const median = allMs[Math.floor(allMs.length / 2)] ?? 0
 console.log(`\n${passed}/${results.length} gecti · cevap suresi medyan ${(median / 1000).toFixed(1)} sn`)
+if (REPEAT > 1) {
+  const byId = new Map<string, { ok: number; all: number; title: string }>()
+  for (const r of results) {
+    const e = byId.get(r.id) ?? { ok: 0, all: 0, title: r.title }
+    e.all++
+    if (!r.failures.length) e.ok++
+    byId.set(r.id, e)
+  }
+  const flaky = [...byId].filter(([, e]) => e.ok < e.all)
+  console.log(flaky.length ? 'Her seferinde gecmeyenler:' : 'Butun senaryolar her tekrarda gecti.')
+  for (const [id, e] of flaky) console.log(`  ${id} ${e.title}: ${e.ok}/${e.all}`)
+}
 
 // okumak icin rapor
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>')

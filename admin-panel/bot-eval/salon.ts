@@ -111,8 +111,29 @@ export class Salon {
     }
   }
 
+  // senaryonun musterisinin onceden alinmis randevulari
+  seed(phone: string, mine: { service: string; employee: string; at: string }[]) {
+    for (const m of mine) {
+      const s = SERVICES.find((x) => x.name === m.service)!
+      this.appts.push({
+        id: `randevu-${++this.seq}`,
+        customer_phone: phone,
+        service_name: m.service,
+        employee_name: m.employee,
+        start: new Date(m.at),
+        minutes: s.duration_minutes,
+        status: 'aktif',
+      })
+    }
+  }
+
   book(body: Record<string, unknown>) {
     if (body.date_warning) return { error: String(body.date_warning) }
+    // gercek fonksiyondaki gibi: iletisim telefonu gecerli bir TR numarasi olmali
+    const digits = String(body.contact_phone ?? '').replace(/\D/g, '')
+    if (!(digits.length === 10 || digits.length === 11 || (digits.length === 12 && digits.startsWith('90')))) {
+      return { error: 'Geçerli bir telefon numarası gerekli' }
+    }
     const service = SERVICES.find((s) => s.name.toLocaleLowerCase('tr') === String(body.service_name ?? '').toLocaleLowerCase('tr'))
     if (!service) return { error: 'Hizmet bulunamadı' }
     const start = new Date(String(body.scheduled_at))
