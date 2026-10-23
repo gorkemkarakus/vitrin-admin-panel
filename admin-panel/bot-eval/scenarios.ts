@@ -1,7 +1,7 @@
 // Gercek musteriler gibi yazilmis senaryolar: kucuk harf, yazim hatasi,
 // noktalama yok, kisaltma ("slm", "1de", "yrn"). Tarihler calistirildigi gune
 // gore hesaplanir (Istanbul). Hafta ici calistirilmali: "yarın" acik gun.
-import { HOLIDAY, SALON_PHONE } from './salon.ts'
+import { EVE_DATE, HOLIDAY, SALON_PHONE } from './salon.ts'
 
 export interface Turn {
   user: string
@@ -9,7 +9,7 @@ export interface Turn {
 }
 interface Ctx {
   turns: Turn[]
-  booked: { at: string; service: string; employee: string }[]
+  booked: { at: string; service: string; employee: string; name: string }[]
   allBot: string
 }
 interface Scenario {
@@ -535,4 +535,174 @@ export const SCENARIOS: Scenario[] = [
     messages: ['tüm bilgilerimi silin hiçbir şey saklamıyorsunuz değil mi'],
     check: (c) => never(c.allBot, /(hiçbir|hiç bir) (veri|bilgi)(yi)? (saklamıyoruz|tutmuyoruz)/i, 'veri saklamıyoruz dedi'),
   },
+
+
+  // ---------------- arife (tatilden onceki gun 13:00'te kapanir) ----------------
+  {
+    id: 'A01',
+    title: 'arife acik mi',
+    messages: [`${Number(EVE_DATE.slice(8))} ekim açık mısınız`],
+    check: (c) => says(c.allBot, /13[:.]00|arife|kapan|yarım gün/i, 'arifede 13:00 kapanış bilgisi'),
+  },
+  {
+    id: 'A02',
+    title: 'arife ogleden sonra randevu',
+    messages: [`${Number(EVE_DATE.slice(8))} ekim saat 15:00 manikür, ece su 05321230100`],
+    check: (c) => never(c.booked.map((b) => b.at).join(), new RegExp(`${EVE_DATE}T1[3-8]`), 'arifede 13:00 sonrasına randevu'),
+  },
+  {
+    id: 'A03',
+    title: 'arife sabah randevu',
+    messages: [`${Number(EVE_DATE.slice(8))} ekim saat 10:00 manikür, ece su 05321230101`],
+    check: (c) => booked(c, `${EVE_DATE}T10:00`, 'Manikür'),
+  },
+
+  // ---------------- fiyat / sure / calisan bilgisi ----------------
+  {
+    id: 'V01',
+    title: 'iki hizmetin fiyati',
+    messages: ['manikür pedikür ikisi ne kadar tutar'],
+    check: (c) => (/950/.test(c.allBot) || (/450/.test(c.allBot) && /500/.test(c.allBot)) ? [] : ['iki fiyat (450 + 500) bekleniyordu']),
+  },
+  { id: 'V02', title: 'hizmet suresi', messages: ['boya ne kadar sürüyo'], check: (c) => says(c.allBot, /120|2 saat|iki saat/i, '120 dk') },
+  {
+    id: 'V03',
+    title: 'calisan o hizmeti yapiyor mu',
+    messages: ['kerem bey boya yapıyo mu'],
+    check: (c) => says(c.allBot, /yapmıyor|hayır|büşra|bakmıyor/i, 'Kerem boya yapmıyor bilgisi'),
+  },
+  { id: 'V04', title: 'cumartesi saatleri', messages: ['cumartesi kaça kadar açıksınız'], check: (c) => says(c.allBot, /19/, '19:00') },
+  {
+    id: 'V05',
+    title: 'calisan hizmeti vermiyor',
+    messages: ['kerem beyle yarın 10:00 boya, mert su 05321230102'],
+    check: (c) => never(c.booked.map((b) => `${b.service}/${b.employee}`).join(), /Boya\/Kerem/, 'Kerem\'e boya randevusu'),
+  },
+
+  // ---------------- gundelik saat ifadeleri ----------------
+  {
+    id: 'W01',
+    title: 'is cikisi 6 gibi',
+    messages: ['yarın iş çıkışı 6 gibi fön çektirebilir miyim, ece su 05321230103'],
+    check: (c) => booked(c, `${TOMORROW}T18:00`, 'Fön'),
+  },
+  {
+    id: 'W02',
+    title: 'sabah ilk saat',
+    messages: ['yarın sabah ilk saat manikür olur mu, ece su 05321230104'],
+    check: (c) => ifBooked(c, [`${TOMORROW}T09:00`]),
+  },
+  {
+    id: 'W03',
+    title: 'oglen arasi',
+    messages: ['yarın öğlen arası kaş aldırırım, ece su 05321230105'],
+    check: (c) => ifBooked(c, [`${TOMORROW}T12:00`, `${TOMORROW}T12:30`, `${TOMORROW}T13:00`]),
+  },
+  {
+    id: 'W04',
+    title: 'saat araligi',
+    messages: ['yarın 11 ile 12 arası manikür, ece su 05321230106'],
+    check: (c) => ifBooked(c, [`${TOMORROW}T11:00`, `${TOMORROW}T11:30`, `${TOMORROW}T12:00`]),
+  },
+  { id: 'W05', title: 'noktasiz 1430', messages: ['yarın 1430 da fön, ece su 05321230107'], check: (c) => ifBooked(c, [`${TOMORROW}T14:30`]) },
+  { id: 'W06', title: 'yaziyla on ucte', messages: ['yarın on üçte manikür, ece su 05321230108'], check: (c) => booked(c, `${TOMORROW}T13:00`, 'Manikür') },
+
+  // ---------------- yazim bicimi ----------------
+  {
+    id: 'U01',
+    title: 'hepsi buyuk harf',
+    messages: ['YARIN 11 SAÇ KESİMİ MEHMET ÖZ 05321234567'],
+    check: (c) => booked(c, `${TOMORROW}T11:00`, 'Saç kesimi'),
+  },
+  {
+    id: 'U02',
+    title: 'emojili',
+    messages: ['yarın 💅 manikür 10da 🙏 ayşe nur kaya 05321231111'],
+    check: (c) => booked(c, `${TOMORROW}T10:00`, 'Manikür'),
+  },
+  { id: 'U03', title: 'hatali hizmet adi', messages: ['yarn manıkur 10 da elif su 05321230109'], check: (c) => booked(c, `${TOMORROW}T10:00`, 'Manikür') },
+  {
+    id: 'U04',
+    title: '"fon cekimi" + 3te',
+    messages: ['yarın 3te fon cekimi istiyom, ece su 05321230110', 'evet'],
+    check: (c) => booked(c, `${TOMORROW}T15:00`, 'Fön'),
+  },
+  { id: 'U05', title: '"kas aldirma"', messages: ['pazartesi 11:00 kas aldirma, ece su 05321230111'], check: (c) => booked(c, `${MONDAY}T11:00`, 'Kaş alımı') },
+  {
+    id: 'U06',
+    title: '+90 parantezli telefon',
+    messages: ['yarın 10:00 manikür, ayla öz +90 (532) 111 22 33'],
+    check: (c) => booked(c, `${TOMORROW}T10:00`, 'Manikür'),
+  },
+  {
+    id: 'U07',
+    title: 'once telefon sonra ad',
+    messages: ['0532 111 22 34 ben selin ak yarın 10:00 fön'],
+    check: (c) => booked(c, `${TOMORROW}T10:00`, 'Fön'),
+  },
+
+  // ---------------- karmasik akislar ----------------
+  {
+    id: 'M01',
+    title: 'randevudan sonra soyad duzeltme (mukerrer yok)',
+    messages: ['yarın 10:00 manikür adım ayşe kaya 05321230112', 'pardon soyadım kara'],
+    check: (c) => (c.booked.length === 1 ? [] : [`1 randevu bekleniyordu, olan ${c.booked.length}`]),
+  },
+  {
+    id: 'M02',
+    title: 'iki ayri randevu ard arda',
+    messages: ['yarın 10:00 manikür, ece su 05321230113', 'bi de pazartesi 14:00 pedikür alalım'],
+    check: (c) => [...booked({ ...c, booked: c.booked.filter((b) => b.service === 'Manikür') }, `${TOMORROW}T10:00`, 'Manikür'), ...booked({ ...c, booked: c.booked.filter((b) => b.service === 'Pedikür') }, `${MONDAY}T14:00`, 'Pedikür')],
+  },
+  {
+    id: 'M03',
+    title: 'uzun sohbetten sonra randevu',
+    messages: ['slm', 'nasılsınız', 'fiyatlarınız nasıl', 'manikür kaç', 'tamam yarın 10 da manikür alayım', 'ece su 05321230114'],
+    check: (c) => booked(c, `${TOMORROW}T10:00`, 'Manikür'),
+  },
+  {
+    id: 'M04',
+    title: 'randevu sonrasi soru',
+    messages: ['yarın 10:00 manikür, ece su 05321230115', 'kaç dk sürüyo'],
+    check: (c) => [...booked(c, `${TOMORROW}T10:00`, 'Manikür'), ...says(c.turns[1]?.bot ?? '', /45/, '45 dk')],
+  },
+  {
+    id: 'M05',
+    title: 'mevcut randevuyu baska gune',
+    mine: [{ service: 'Manikür', employee: 'Elif Yılmaz', at: at(TOMORROW, '10:00') }],
+    messages: ['randevumu pazartesiye alabilir miyiz aynı saat'],
+    check: (c) => booked(c, `${MONDAY}T10:00`, 'Manikür'),
+  },
+  {
+    id: 'M06',
+    title: 'iptal sonra tatile yeni randevu',
+    mine: [{ service: 'Manikür', employee: 'Elif Yılmaz', at: at(TOMORROW, '10:00') }],
+    messages: ['randevumu iptal et', `${Number(HOLIDAY.date.slice(8))} ekime 11:00e manikür alalım o zaman`],
+    check: (c) => never(c.booked.map((b) => b.at).join(), new RegExp(HOLIDAY.date), 'tatil gününe randevu'),
+  },
+
+  // ---------------- randevu disi mesajlar ----------------
+  {
+    id: 'Z01',
+    title: 'reklam/spam',
+    messages: ['merhaba sitenizi googleda üst sıraya çıkaralım uygun fiyata'],
+    check: (c) => [...none(c), ...(c.allBot.length > 400 ? ['spama uzun cevap'] : [])],
+  },
+  { id: 'Z02', title: 'is basvurusu', messages: ['eleman arıyor musunuz'], check: (c) => never(c.allBot, /eleman arıyoruz|alım yapıyoruz/i, 'iş ilanı uydurdu') },
+  { id: 'Z03', title: 'tesekkur', messages: ['geçen hafta geldim çok memnun kaldım teşekkürler'], check: (c) => none(c) },
+  {
+    id: 'Z04',
+    title: 'rakip kiyas',
+    messages: ['karşıdaki kuaför daha ucuz siz niye pahalısınız'],
+    check: (c) => [...none(c), ...never(c.allBot, /onlar(ın)? (kötü|kalitesiz)/i, 'rakibi kötüledi')],
+  },
+  {
+    id: 'Z05',
+    title: 'bugun aksam',
+    messages: ['bugün akşam 6da fön olur mu, ece su 05321230116'],
+    check: (c) =>
+      new Date(Date.now() + 3 * 3600000).getUTCHours() < 17 ? booked(c, `${plus(0)}T18:00`, 'Fön') : ifBooked(c, []),
+  },
+  { id: 'Z06', title: 'dun icin', messages: ['dün için randevu alabilir miyim'], check: (c) => none(c) },
 ]
+

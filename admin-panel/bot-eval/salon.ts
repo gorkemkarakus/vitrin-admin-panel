@@ -26,6 +26,9 @@ export const EMPLOYEES = [
 ]
 
 // Pazartesi-Cumartesi 09:00-19:00, pazar kapali
+// tatilden bir onceki gun (arife) 13:00'te kapanir
+export const EVE_DATE = new Date(Date.parse(HOLIDAY.date + "T00:00:00Z") - 86400000).toISOString().slice(0, 10)
+const EVE_CLOSE = 13 * 60
 const OPEN = 9 * 60
 const CLOSE = 19 * 60
 const WEEKDAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
@@ -34,6 +37,7 @@ export const WORKING_HOURS = WEEKDAYS.slice(1).map((day) => ({ day, starts_at: '
 export interface Appt {
   id: string
   customer_phone: string
+  customer_name?: string
   service_name: string
   employee_name: string
   start: Date
@@ -75,8 +79,10 @@ export class Salon {
     )
   }
 
-  private dayState(start: Date, minutes: number): 'kapali-tatil' | 'kapali-pazar' | 'saat-disi' | 'acik' {
+  private dayState(start: Date, minutes: number): 'kapali-tatil' | 'kapali-pazar' | 'saat-disi' | 'arife' | 'acik' {
     if (istDate(start) === HOLIDAY.date) return 'kapali-tatil'
+    // arife: salon 13:00'te kapanir (gercekte calisanlara 13:00 sonrasi blok yazilir, cevap 'dolu' olur)
+    if (istDate(start) === EVE_DATE && istMinutes(start) + minutes > EVE_CLOSE) return 'arife'
     if (ist(start).getUTCDay() === 0) return 'kapali-pazar'
     const m = istMinutes(start)
     if (m < OPEN || m + minutes > CLOSE) return 'saat-disi'
@@ -153,6 +159,7 @@ export class Salon {
         const appt: Appt = {
           id: `randevu-${++this.seq}`,
           customer_phone: String(body.customer_phone),
+          customer_name: String(body.customer_name ?? ''),
           service_name: service.name,
           employee_name: emp,
           start,

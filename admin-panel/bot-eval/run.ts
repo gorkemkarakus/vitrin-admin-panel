@@ -108,7 +108,7 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
     return { id: sc.id, title: sc.title, turns, failures: ['HATA: ' + (e instanceof Error ? e.message : e)], ms }
   }
 
-  const booked = salon.activeFor(phone).map((a) => ({ at: istLocal(a.start), service: a.service_name, employee: a.employee_name }))
+  const booked = salon.activeFor(phone).map((a) => ({ at: istLocal(a.start), service: a.service_name, employee: a.employee_name, name: a.customer_name ?? '' }))
   const failures = sc.check({ turns, booked, allBot: turns.map((t) => t.bot).join('\n') })
   // her senaryoda gecerli genel kurallar
   const all = turns.map((t) => t.bot).join('\n')
