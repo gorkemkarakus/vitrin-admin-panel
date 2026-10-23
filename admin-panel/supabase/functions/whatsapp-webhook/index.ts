@@ -3,6 +3,22 @@ import { corsHeaders, json } from '../_shared/http.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
 import { botSharedSecret, resolveBusiness } from '../_shared/resolveBusiness.ts'
 import { runChatbot } from '../_shared/chatbot.ts'
+import { handler as staffHandler } from '../staff-whatsapp-webhook/handler.ts'
+import { handler as contextHandler } from '../chatbot-context/handler.ts'
+import { handler as bookHandler } from '../book-appointment/handler.ts'
+import { handler as cancelHandler } from '../cancel-appointment/handler.ts'
+import { handler as rescheduleHandler } from '../reschedule-appointment/handler.ts'
+import { handler as logHandler } from '../chatbot-log-message/handler.ts'
+
+// Asistanin cagirdigi fonksiyonlar bu surecte calisir (HTTP yolculugu yok).
+const BOT_HANDLERS: Record<string, (req: Request) => Promise<Response>> = {
+  'staff-whatsapp-webhook': staffHandler,
+  'chatbot-context': contextHandler,
+  'book-appointment': bookHandler,
+  'cancel-appointment': cancelHandler,
+  'reschedule-appointment': rescheduleHandler,
+  'chatbot-log-message': logHandler,
+}
 import { isOptOutMessage } from '../_shared/marketing.ts'
 import { sendTypingIndicator, sendWhatsAppText } from '../_shared/notify.ts'
 
@@ -144,7 +160,7 @@ async function answerWithChatbot(admin: SupabaseClient, payload: N8nForwardPaylo
   const typing = sendTypingIndicator({ phoneNumberId: payload.phone_number_id, messageId: payload.wamid })
   let result
   try {
-    result = await runChatbot(payload, { supabaseUrl, anonKey, openaiKey, botSecret })
+    result = await runChatbot(payload, { supabaseUrl, anonKey, openaiKey, botSecret, handlers: BOT_HANDLERS })
   } catch (e) {
     console.error('whatsapp-webhook: asistan hatası:', e instanceof Error ? e.message : e, 'wamid:', payload.wamid)
     return

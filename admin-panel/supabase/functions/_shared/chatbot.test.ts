@@ -465,3 +465,30 @@ Deno.test('talimat: yer tutucu numara yok; salon telefonu ve kapali gunler eklen
   assert(!noPhone.includes('XXX'))
   assert(noPhone.includes('müşteriye ASLA bir numara yazma'))
 })
+
+Deno.test('dogrudan cagri: bot fonksiyonlari aga cikmadan isleyicilere gider, OpenAI aga gider', async () => {
+  const viaNetwork: string[] = []
+  const viaHandler: string[] = []
+  const net = (async (url: string | URL) => {
+    viaNetwork.push(String(url))
+    return new Response(JSON.stringify(openaiText('Fön 250 TL.')))
+  }) as typeof fetch
+  const h = (name: string, data: unknown) => async (req: Request) => {
+    viaHandler.push(name)
+    assertEquals(req.headers.get('x-bot-secret'), 'gizli')
+    return new Response(JSON.stringify(data))
+  }
+  const r = await runChatbot(input, {
+    ...deps(net),
+    handlers: {
+      'staff-whatsapp-webhook': h('staff', { handled: false }),
+      'chatbot-context': h('context', context),
+      'chatbot-log-message': h('log', { ok: true }),
+    },
+  })
+  await r.log
+  assertEquals(r.reply, 'Fön 250 TL.')
+  assertEquals(viaNetwork.length, 1)
+  assert(viaNetwork[0].includes('api.openai.com'))
+  assertEquals(viaHandler.sort(), ['context', 'log', 'staff'])
+})

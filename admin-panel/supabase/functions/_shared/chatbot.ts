@@ -26,6 +26,11 @@ export interface ChatbotDeps {
   botSecret: string
   openaiKey: string
   fetch?: typeof fetch
+  // Ayni surecte calisan isleyiciler (whatsapp-webhook verir): bot
+  // fonksiyonlarina giden istekler HTTP'ye cikmadan bunlara gider. Her ayri
+  // fonksiyon cagrisi ag yolculugu + soguk baslatma ekliyordu; canlida cevap
+  // 25-30 sn suruyordu, botun kendi isi ~4 sn.
+  handlers?: Record<string, (req: Request) => Promise<Response>>
 }
 
 export interface ChatbotResult {
@@ -91,7 +96,13 @@ export function earlyHourQuestionText(hour: number, minute: string): string {
 }
 
 export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promise<ChatbotResult> {
-  const f = deps.fetch ?? fetch
+  const baseFetch = deps.fetch ?? fetch
+  const prefix = `${deps.supabaseUrl}/functions/v1/`
+  const f = (async (url: string | URL, init?: RequestInit) => {
+    const u = String(url)
+    const local = u.startsWith(prefix) ? deps.handlers?.[u.slice(prefix.length)] : undefined
+    return local ? local(new Request(u, init)) : baseFetch(url, init)
+  }) as typeof fetch
   const outputs: Record<string, Json> = { Webhook: { body: { ...input } } }
   const $ = (name: string) => {
     if (!(name in outputs)) throw new Error(`chatbot: "${name}" adimi henuz calismadi`)
