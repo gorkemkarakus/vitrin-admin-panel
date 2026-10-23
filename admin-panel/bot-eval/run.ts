@@ -24,6 +24,8 @@ const REPEAT = repeatArg ? Math.max(1, Number(repeatArg.split('=')[1]) || 1) : 1
 const filterArg = Deno.args.find((a) => !a.startsWith('--'))
 const filter = filterArg ? new RegExp(filterArg, 'i') : null
 const BASE = 'https://sahte.supabase.co'
+// OpenAI kullanimi: talimatin ne kadarinin onbellekten okundugu ve maliyet
+const usage = { calls: 0, prompt: 0, cached: 0, completion: 0 }
 
 interface Result {
   id: string
@@ -58,7 +60,17 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
 
   const fakeFetch = (async (url: string | URL, init?: RequestInit) => {
     const u = String(url)
-    if (u.includes('api.openai.com')) return fetch(url, init)
+    if (u.includes('api.openai.com')) {
+      const res = await fetch(url, init)
+      const j = await res.clone().json().catch(() => null)
+      if (j?.usage) {
+        usage.calls++
+        usage.prompt += j.usage.prompt_tokens ?? 0
+        usage.cached += j.usage.prompt_tokens_details?.cached_tokens ?? 0
+        usage.completion += j.usage.completion_tokens ?? 0
+      }
+      return res
+    }
     const body = JSON.parse(String(init?.body ?? '{}'))
     const fn = u.split('/functions/v1/')[1]
     const ok = (data: unknown) => new Response(JSON.stringify(data), { status: 200 })
@@ -145,6 +157,11 @@ const passed = results.filter((r) => !r.failures.length).length
 const allMs = results.flatMap((r) => r.ms).sort((a, b) => a - b)
 const median = allMs[Math.floor(allMs.length / 2)] ?? 0
 console.log(`\n${passed}/${results.length} gecti · cevap suresi medyan ${(median / 1000).toFixed(1)} sn`)
+// gpt-5-mini: girdi $0.25/M, onbellekli girdi $0.025/M, cikti $2/M
+const cost = ((usage.prompt - usage.cached) * 0.25 + usage.cached * 0.025 + usage.completion * 2) / 1e6
+console.log(
+  `OpenAI: ${usage.calls} istek · girdi ${usage.prompt} token (%${usage.prompt ? Math.round((usage.cached / usage.prompt) * 100) : 0} onbellekten) · cikti ${usage.completion} · ~$${cost.toFixed(3)} (istek basi ~$${(cost / Math.max(1, usage.calls)).toFixed(4)})`,
+)
 if (REPEAT > 1) {
   const byId = new Map<string, { ok: number; all: number; title: string }>()
   for (const r of results) {

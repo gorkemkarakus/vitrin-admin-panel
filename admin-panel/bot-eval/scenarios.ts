@@ -844,7 +844,8 @@ export const SCENARIOS: Scenario[] = [
     id: 'SV02',
     title: 'olmayan hizmet fiyati',
     messages: ['ombre kaç para'],
-    check: (c) => never(c.allBot, /ombre\S* \d+|\d+ ?(TL|₺).*ombre/i, 'olmayan hizmete fiyat uydurdu'),
+    // "Ombre listede yok; Boya 1400 TL" dogru cevap: fiyat ayni cumlede ombreye ait olmali
+    check: (c) => never(c.allBot, /ombre[^.;?!\n]*\d+ ?(TL|₺)|\d+ ?(TL|₺)[^.;?!\n]*ombre/i, 'olmayan hizmete fiyat uydurdu'),
   },
   {
     id: 'SV03',

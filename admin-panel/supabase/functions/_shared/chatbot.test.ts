@@ -99,7 +99,10 @@ Deno.test('sohbet: OpenAI cevabi gider, mesaj ve cevap kaydedilir', async () => 
   assertEquals(ai.body.model, 'gpt-5-mini')
   assertEquals(ai.body.reasoning_effort, 'low')
   const msgs = ai.body.messages as { role: string; content: string }[]
-  assert(msgs[0].content.startsWith('Bu sohbette "Güzel Salon" adlı işletmenin WhatsApp/Instagram asistanısın'))
+  // sabit kurallar once (onbellek), salona ozel bilgiler ikinci mesajda
+  assert(msgs[0].content.startsWith('Sen bir işletmenin WhatsApp/Instagram asistanısın.'))
+  assert(!msgs[0].content.includes('Güzel Salon'))
+  assert(msgs[1].content.startsWith('İŞLETME BİLGİLERİ\nİşletme: "Güzel Salon"'))
   assertEquals(msgs.at(-1), { role: 'user', content: 'Fön kaç para?' })
   const log = calls.find((c) => c.url.endsWith('chatbot-log-message'))!
   assertEquals(log.body, {
@@ -452,7 +455,8 @@ Deno.test('talimat: yer tutucu numara yok; salon telefonu ve kapali gunler eklen
       ),
     )
     const ai = calls.find((c) => c.url.includes('openai'))!
-    return (ai.body.messages as { content: string }[])[0].content
+    const msgs = ai.body.messages as { role: string; content: string }[]
+    return msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
   }
   const withPhone = await promptFor({
     ...context,
@@ -460,7 +464,7 @@ Deno.test('talimat: yer tutucu numara yok; salon telefonu ve kapali gunler eklen
     closed_days: [{ name: 'Cumhuriyet Bayramı', start_date: '2026-10-29', end_date: '2026-10-29', eve_closes_at: '13:00' }],
   })
   assert(!withPhone.includes('XXX'))
-  assert(withPhone.includes("'0362 555 12 34'"))
+  assert(withPhone.includes('Salonun telefonu: 0362 555 12 34'))
   assert(withPhone.includes('29 Ekim (Perşembe): Cumhuriyet Bayramı'))
   const noPhone = await promptFor(context)
   assert(!noPhone.includes('XXX'))
