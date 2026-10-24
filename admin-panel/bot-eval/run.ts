@@ -161,7 +161,8 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
   // konusma sekli (sabit sablonlar dahil): islev dogru olsa da gercek bir salon calisani boyle yazmaz
   for (const b of turns.map((t) => t.bot)) {
     const sentences = b.split(/(?<=[.?!])\s+/)
-    if (/\p{L}+(mişsiniz|mışsınız|muşsunuz|müşsünüz)\b/iu.test(b)) failures.push(`uslup: -mişsiniz kipi: "${b}"`)
+    // "salı da yazmışsınız" dogal; "manikür istermişsiniz" degil
+    if (/\p{L}+(?<!yaz|de|belirt|söyle)(mişsiniz|mışsınız|muşsunuz|müşsünüz)\b/iu.test(b)) failures.push(`uslup: -mişsiniz kipi: "${b}"`)
     if (sentences.some((s) => !s.trim().endsWith('?') && /\b(istediniz|istiyorsunuz|istemişsiniz|istermişsiniz)\b/i.test(s)))
       failures.push(`uslup: istegi geri ozetledi: "${b}"`)
     if (/başka (bir )?(konuda|şey|isteğiniz|sorunuz)|yardımcı olayım mı|yardımcı olabileceğim başka/i.test(b))

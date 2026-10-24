@@ -110,6 +110,30 @@ export function lateNotice(parsed: Json, message: string, context: Json): string
     : 'Maalesef gecikmeyi buradan iletemiyorum, salonu arayarak haber verebilirsiniz.'
 }
 
+// "Yarın biraz erken gelsem olur mu 10 gibi" bir soru; model randevuyu sormadan
+// tasiyordu (testte 3'te 3). Varsayim sorusunda once onay alinir; "alalım",
+// "alabilir miyiz" gibi acik isteklerde dogrudan tasinir.
+export function confirmHypotheticalReschedule(parsed: Json, message: string): string | null {
+  if (parsed.toolName !== 'reschedule_appointment') return null
+  if (!/gelsem|gelirsem|gelebilir miyim|olur mu|olabilir mi|mümkün mü/i.test(message)) return null
+  if (/alalım|alın\b|alır mısınız|alabilir mi|değiştir|taşı|kaydır|ertele|yapalım|olsun/i.test(message)) return null
+  const args = (parsed.toolArgs ?? {}) as { new_date?: string; new_time?: string }
+  if (!args.new_date || !args.new_time) return null
+  const d = new Date(args.new_date + 'T00:00:00Z')
+  const month = MONTHS[d.getUTCMonth()]
+  return `Randevunuzu ${d.getUTCDate()} ${month[0].toLocaleUpperCase('tr')}${month.slice(1)} ${args.new_time} olarak güncellememi ister misiniz?`
+}
+
+// Model iptal isteginde bazen ayni randevuyu yeniden acmaya calisiyordu (book_appointment;
+// testte 6'da 1) ve musteri "o saat dolu" cevabi aliyordu. Boyle olunca model
+// bir kez duzeltmeyle yeniden sorulur.
+export function bookingInsteadOfCancel(parsed: Json, message: string, context: Json): boolean {
+  if (parsed.toolName !== 'book_appointment') return false
+  if (!/iptal/i.test(message)) return false
+  if (/alalım|alayım|alabilir miyim|alır mısınız|yeni randevu|tekrar randevu/i.test(message)) return false
+  return Array.isArray(context.appointments) && context.appointments.length > 0
+}
+
 // Birden fazla aktif randevusu olan musteri "randevumu iptal et" deyip hangisi
 // oldugunu soylemezse (gun, tarih, saat, hizmet, calisan yok) model bazen
 // birini secip iptal ediyordu (gpt-6-luna, testte 8'de 3). Iptal geri
@@ -320,10 +344,19 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
     outputs['Parse OpenAI Response'] = parsed
   } else {
     const openaiRequest = run('Build OpenAI Request', flow.buildOpenAIRequest as Step, context)
-    const askOpenAI = async (req: Json) =>
-      fromResponsesResponse(
-        await postJson(f, 'https://api.openai.com/v1/responses', { Authorization: `Bearer ${deps.openaiKey}` }, toResponsesRequest(req), 30000, false),
-      )
+    // OpenAI'in anlik sunucu hatalari (5xx, 429) bir kez yeniden denenir; yoksa
+    // musteri hic cevap almiyordu (testte HTTP 520 goruldu)
+    const askOpenAI = async (req: Json): Promise<Json> => {
+      const call = () =>
+        postJson(f, 'https://api.openai.com/v1/responses', { Authorization: `Bearer ${deps.openaiKey}` }, toResponsesRequest(req), 30000, false)
+      try {
+        return fromResponsesResponse(await call())
+      } catch (e) {
+        if (!/HTTP (5\d\d|429)/.test(e instanceof Error ? e.message : '')) throw e
+        await new Promise((r) => setTimeout(r, 800))
+        return fromResponsesResponse(await call())
+      }
+    }
     const openaiResponse = await timed('openai', askOpenAI(openaiRequest))
     parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, openaiResponse)
     const misread = misreadCustomerName(parsed, input.message)
@@ -341,13 +374,31 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
       const retry = await timed('openai-tekrar', askOpenAI(retryRequest))
       parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, retry)
     }
+    if (bookingInsteadOfCancel(parsed, input.message, context)) {
+      const retry = await timed(
+        'openai-tekrar',
+        askOpenAI({
+          ...openaiRequest,
+          messages: [
+            ...(openaiRequest.messages as unknown[]),
+            {
+              role: 'system',
+              content:
+                'Düzeltme: müşteri mevcut randevusunu İPTAL etmek istiyor, yeni randevu almak istemiyor. book_appointment çağırma; "Bu müşterinin aktif randevuları" listesinden ilgili randevu için cancel_appointment çağır (birden fazla randevu varsa ve hangisi belli değilse sor).',
+            },
+          ],
+        }),
+      )
+      parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, retry)
+    }
   }
   const guardQuestion =
     parsed.hasToolCall === true
       ? (askAboutEarlyHour(parsed, input.message, context) ??
         askForSurname(parsed, input.message, context) ??
         askWhichCancel(parsed, input.message, context) ??
-        lateNotice(parsed, input.message, context))
+        lateNotice(parsed, input.message, context) ??
+        confirmHypotheticalReschedule(parsed, input.message))
       : null
 
   let replyStep: Json

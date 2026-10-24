@@ -2,7 +2,7 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { askForSurname, askWhichCancel, lateNotice, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
+import { askForSurname, askWhichCancel, bookingInsteadOfCancel, confirmHypotheticalReschedule, lateNotice, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
 import { isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
 
@@ -693,4 +693,47 @@ Deno.test('iki hizmet iki saat: model saatle eslestirdigi hizmeti korur, ikinci 
     r.reply,
     'Randevunuz oluşturuldu ✅\nManikür - 3 Kasım 10:00 - Elif Yılmaz\n\nBir seferde bir randevu alabiliyorum; diğer randevunun bilgilerini ayrıca yazarsanız onu da hemen ayarlayayım.',
   )
+})
+
+Deno.test('varsayim sorusu ("erken gelsem olur mu"): tasimadan once onay istenir', () => {
+  const resch = { hasToolCall: true, toolName: 'reschedule_appointment', toolArgs: { appointment_id: 'a1', new_date: '2026-10-24', new_time: '10:00' } }
+  assertEquals(
+    confirmHypotheticalReschedule(resch, 'yarın biraz erken gelsem olur mu 10 gibi'),
+    'Randevunuzu 24 Ekim 10:00 olarak güncellememi ister misiniz?',
+  )
+  assertEquals(confirmHypotheticalReschedule(resch, 'randevumu 10a alabilir miyiz'), null)
+  assertEquals(confirmHypotheticalReschedule(resch, 'evet'), null)
+  assertEquals(confirmHypotheticalReschedule(resch, '10 olsun olur mu'), null)
+})
+
+Deno.test('iptal isteginde book_appointment: duzeltmeyle yeniden sorulur', () => {
+  const book = { hasToolCall: true, toolName: 'book_appointment', toolArgs: {} }
+  const ctx = { appointments: [{ id: 'a1' }] }
+  assertEquals(bookingInsteadOfCancel(book, 'iptal edebilir miyiz o randevuyu', ctx), true)
+  assertEquals(bookingInsteadOfCancel(book, 'iptal edip yarına yeni randevu alalım', ctx), false)
+  assertEquals(bookingInsteadOfCancel(book, 'iptal edebilir miyiz', { appointments: [] }), false)
+  assertEquals(bookingInsteadOfCancel({ ...book, toolName: 'cancel_appointment' }, 'iptal et', ctx), false)
+})
+
+Deno.test('OpenAI anlik sunucu hatasi: bir kez yeniden denenir', async () => {
+  let openaiCalls = 0
+  const f = (async (url: string | URL, init?: RequestInit) => {
+    const u = String(url)
+    if (u.includes('openai.com')) {
+      openaiCalls++
+      return openaiCalls === 1 ? new Response('{}', { status: 520 }) : new Response(JSON.stringify(openaiText('Fön 250 TL.')))
+    }
+    const key = u.split('/functions/v1/')[1]
+    const routes: Record<string, unknown> = {
+      'staff-whatsapp-webhook': { handled: false },
+      'chatbot-context': context,
+      'chatbot-log-message': { ok: true },
+    }
+    void init
+    return new Response(JSON.stringify(routes[key] ?? {}))
+  }) as typeof fetch
+  const r = await runChatbot({ ...input, message: 'Fön kaç para?' }, deps(f))
+  await r.log
+  assertEquals(openaiCalls, 2)
+  assertEquals(r.reply, 'Fön 250 TL.')
 })

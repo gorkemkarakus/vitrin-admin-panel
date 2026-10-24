@@ -133,6 +133,7 @@ const staticSystemPrompt = `Sen bir işletmenin WhatsApp/Instagram asistanısın
 - Randevuyu ancak sistem onayladıktan sonra "oluşturuldu" diye bildir. Müsaitliği sistem söylemeden "uygun", "boş", "yer var" deme. "Onaylarsanız randevunuzu alayım" gibi vaat cümleleri kurma: eksik bilgi varsa sadece onu sor, bilgiler tamamsa fonksiyonu çağır.
 - Sağlık/yaralanma konularında (kanama, kırık tırnak, alerji reaksiyonu, ağrı vb.) geçmiş olsun de ve en fazla 1-2 kısa cümlelik basit bir ilk yardım önerisi ver (madde listesi YAPMA); durum ciddiyse doktora başvurmasını söyle, istersen salonda yapılabilecekleri tek cümleyle ekle.
 - Müşteri fotoğraf/görsel göndermeyi teklif ederse: görselleri göremediğini kısaca söyle, istediğini yazmasını rica et.
+- Müşteri listedeki bir hizmetin özel bir türünü sorarsa (çocuk saç kesimi, uzun saç boyası, erkek manikürü gibi) ve listede o tür için ayrı fiyat yoksa, liste fiyatını söyle ama o türün fiyatıymış gibi sunma: "Saç kesimi 450 TL; çocuk için ayrı fiyat bilgim yok."
 - Sistemde olmayan salon bilgilerini (ödeme yöntemi, kredi kartı, taksit, otopark, kampanya, indirim, iptal/gelmeme ücreti, adres) ASLA uydurma; bilmediğini söyle ve salonu aramasını öner.
 - İki kelimelik ad soyad (ör. "ece su", "can er") tam addır; soyad isteme.
 - Müşterinin yazım hatalarını cevabında tekrarlama (ör. müşteri "hafaya" yazdıysa sen "haftaya" diye düzgün yaz); her kelimeyi doğru yazımıyla kullan.
@@ -1048,7 +1049,10 @@ if (result.status === 'booked') {
   // tekrar sormali). Digerlerinin (once alinan hizmet/tarih/saat) kaybolmadigi
   // acikca belirtiliyor ki musteri "bastan mi basliyoruz" sanmasin.
   if (errMsg === 'Geçerli bir telefon numarası giriniz (ör. 0532 123 45 67)') {
-    reply = 'Kusura bakmayın, telefon numaranızı tam alamadım. 0532 123 45 67 gibi tekrar yazar mısınız?';
+    // +44 gibi yabanci numara eksik degil; "tam alamadım" yaniltici olurdu
+    reply = /\+\s?(?!90)\d/.test(webhookData.message || '')
+      ? 'Maalesef randevu için Türkiye\'deki bir telefon numarası gerekiyor. Türk numaranız yoksa salonu arayarak randevu alabilirsiniz.'
+      : 'Kusura bakmayın, telefon numaranızı tam alamadım. 0532 123 45 67 gibi tekrar yazar mısınız?';
   } else if (errMsg === 'Geçmiş bir tarih/saat için randevu oluşturulamaz') {
     reply = 'Maalesef o saat geçti, başka bir gün ya da saat söyler misiniz?';
   } else if (errMsg === 'scheduled_at geçersiz') {
