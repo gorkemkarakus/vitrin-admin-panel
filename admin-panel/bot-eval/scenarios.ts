@@ -986,7 +986,10 @@ export const SCENARIOS: Scenario[] = [
     id: 'KB14',
     title: 'ozur dileyen musteri',
     messages: ['pardon çok mesaj attım kusura bakmayın, yarın 10a manikür alabilir miyim'],
-    check: (c) => never(c.allBot, /özür dilerim|kusura bakmayın/i, 'müşteri özür dilerken bot da özür diledi'),
+    check: (c) => [
+      ...never(c.allBot, /özür dilerim|kusura bakmayın/i, 'müşteri özür dilerken bot da özür diledi'),
+      ...says(c.allBot, /manikür|10[:.]00/i, 'anlaşılan randevuyu soru içinde anması'),
+    ],
   },
   {
     id: 'KB15',
