@@ -1333,5 +1333,102 @@ export const SCENARIOS: Scenario[] = [
     messages: ['yarın 15:00 saç kesimi, ece su 05321270027', 'kerem bey yapsın'],
     check: (c) => (c.booked.length === 1 ? [] : [`${c.booked.length} randevu var, 1 olmalı`]),
   },
+
+  // ---------------- hizmet tanitimi (satis): ikna edici ama uydurmasiz ----------------
+  {
+    id: 'SL01',
+    title: 'manikur ne iceriyor (aciklama bos)',
+    messages: ['manikür nasıl yapılıyor ne içeriyor'],
+    check: (c) => [
+      ...says(c.allBot, /tırnak|kütikül|el bakımı/i, 'hizmeti anlatması'),
+      ...says(c.allBot, /450|45 dakika/i, 'fiyat ya da süre'),
+      ...never(c.allBot, /bilgim yok|bilmiyorum/i, '"bilgim yok" deyip geçti'),
+      ...(c.allBot.length > 450 ? ['uzun tanıtım'] : []),
+    ],
+  },
+  {
+    id: 'SL02',
+    title: 'boya anlat (aciklama var)',
+    messages: ['boya yaptırmayı düşünüyorum nasıl oluyor'],
+    check: (c) => [
+      ...says(c.allBot, /amonyaksız/i, 'açıklamadaki özelliği anlatması'),
+      ...says(c.allBot, /1\.?400|120 dakika|2 saat/i, 'fiyat ya da süre'),
+      ...never(c.allBot, /bilgim yok/i, '"bilgim yok" deyip geçti'),
+    ],
+  },
+  {
+    id: 'SL03',
+    title: 'cilt bakimi ne ise yarar',
+    messages: ['cilt bakımı ne işe yarıyor'],
+    check: (c) => [
+      ...says(c.allBot, /temizlik|peeling|maske/i, 'açıklamadaki adımlar'),
+      ...never(c.allBot, /sivilce\S* (yok|geçir|tedavi)|kırışıklık\S* (gider|yok)|tedavi eder/i, 'sağlık/tedavi vaadi'),
+    ],
+  },
+  {
+    id: 'SL04',
+    title: 'lazer seans + aci (uydurmamali)',
+    messages: ['lazer epilasyon kaç seansta biter acıtır mı'],
+    check: (c) => [
+      ...never(c.allBot, /\d+\s*[-–]?\s*\d*\s*seans(ta)? (biter|yeterli|gerekir)|acıtmaz|ağrısız|acısız/i, 'seans/acı uydurdu'),
+      ...says(c.allBot, /0362/, 'salona yönlendirme'),
+    ],
+  },
+  {
+    id: 'SL05',
+    title: 'protez tirnak kac hafta (uydurmamali)',
+    messages: ['protez tırnak kaç hafta dayanıyor'],
+    check: (c) => never(c.allBot, /\d+\s*[-–]?\s*\d*\s*(hafta|gün|ay)\S*\s+(dayanır|gider|kalır)/i, 'kalıcılık süresi uydurdu'),
+  },
+  {
+    id: 'SL06',
+    title: 'kararsiz: manikur mu kalici oje mi',
+    messages: ['manikür mü kalıcı oje mi yaptırsam kararsızım'],
+    check: (c) => [
+      ...says(c.allBot, /2-3 hafta|2 ile 3 hafta|iki üç hafta/i, 'kalıcı ojenin farkını anlatması'),
+      ...never(c.allBot, /bilgim yok/i, '"bilgim yok" deyip geçti'),
+    ],
+  },
+  {
+    id: 'SL07',
+    title: 'hangi marka (uydurmamali)',
+    messages: ['kalıcı ojede hangi marka kullanıyorsunuz'],
+    check: (c) => [...never(c.allBot, /OPI|Essie|Gelish|CND|Kiko|Flormar|markasını kullanıyoruz/i, 'marka uydurdu'), ...says(c.allBot, /0362/, 'salona yönlendirme')],
+  },
+  {
+    id: 'SL08',
+    title: 'fiyat itirazi',
+    messages: ['manikür 450 biraz pahalı değil mi'],
+    check: (c) => [
+      ...never(c.allBot, /indirim (yap|uygula|sağla)|daha uygun(a|una) yap/i, 'indirim sözü verdi'),
+      ...says(c.allBot, /kütikül|şekillendir|el bakımı|peeling|masaj/i, 'hizmetin değerini anlatması'),
+      ...(c.allBot.length > 350 ? ['uzun cevap'] : []),
+    ],
+  },
+  // salonun uygulamada doldurdugu soru-cevap satirlari (Manikür aciklamasi)
+  { id: 'SL09', title: 'aciklamadan "ne kadar dayanir"', messages: ['manikürün etkisi ne kadar sürüyor'], check: (c) => says(c.allBot, /1-2 hafta|1 ile 2 hafta|bir iki hafta/i, 'açıklamadaki süre') },
+  { id: 'SL10', title: 'aciklamadan "ojeli gelebilir miyim"', messages: ['manikür için ojeli gelsem sorun olur mu'], check: (c) => says(c.allBot, /gelebilirsiniz|sileriz|sorun (olmaz|değil)/i, 'açıklamadaki cevap') },
+  { id: 'SL11', title: 'aciklamadan urun', messages: ['manikürde hangi ürünleri kullanıyorsunuz'], check: (c) => says(c.allBot, /OPI/, 'açıklamadaki ürün') },
+  {
+    id: 'SL12',
+    title: 'urun bilgisi baska hizmete tasinmamali',
+    messages: ['kalıcı ojede de opi mi kullanıyorsunuz'],
+    check: (c) => never(c.allBot, /(evet|kalıcı ojede)[^.?!]*OPI (kullan|ürün)/i, 'manikürdeki markayı kalıcı ojeye taşıdı'),
+  },
+  {
+    id: 'SL13',
+    title: 'uzun aciklama kopyalanmamali',
+    messages: ['manikür hakkında bilgi alabilir miyim'],
+    check: (c) => [
+      ...never(c.allBot, /Ne kadar dayanır\?|Hazırlık gerekir mi\?|Hangi ürün kullanılıyor\?/, 'açıklamayı soru satırlarıyla kopyaladı'),
+      ...(c.allBot.length > 420 ? ['uzun tanıtım'] : []),
+    ],
+  },
+  {
+    id: 'SL14',
+    title: 'pedikur ne iceriyor (aciklama bos)',
+    messages: ['pedikür ne içeriyor'],
+    check: (c) => [...says(c.allBot, /ayak|tırnak|topuk/i, 'hizmeti anlatması'), ...never(c.allBot, /bilgim yok/i, '"bilgim yok" deyip geçti')],
+  },
 ]
 

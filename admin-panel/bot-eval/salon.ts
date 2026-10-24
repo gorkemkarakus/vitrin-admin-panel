@@ -10,7 +10,18 @@ export const SERVICES = [
   { name: 'Fön', duration_minutes: 30, price: 250, description: null },
   { name: 'Boya', duration_minutes: 120, price: 1400, description: 'Dip boya ve tüm boya. Amonyaksız seçenek var; öncesinde alerji testi önerilir.' },
   { name: 'Kaş alımı', duration_minutes: 20, price: 200, description: null },
-  { name: 'Manikür', duration_minutes: 45, price: 450, description: null },
+  // salonun uygulamadaki 'sik sorulanlar' satirlariyla doldurdugu gibi
+  {
+    name: 'Manikür',
+    duration_minutes: 45,
+    price: 450,
+    description: [
+      'Tırnaklar şekillendirilir, kütiküller kesilmeden itilerek bakım yapılır, el peelingi ve nemlendirici masajla biter. Tek kullanımlık steril törpü kullanıyoruz.',
+      'Ne kadar dayanır? Bakımın etkisi 1-2 hafta sürer.',
+      'Hazırlık gerekir mi? Gerek yok, ojeli gelebilirsiniz, biz sileriz.',
+      'Hangi ürün kullanılıyor? OPI bakım ürünleri.',
+    ].join('\n'),
+  },
   { name: 'Kalıcı oje', duration_minutes: 60, price: 550, description: '2-3 hafta dayanır. Eski kalıcı ojenin sökümü ücretsiz.' },
   { name: 'Pedikür', duration_minutes: 60, price: 500, description: null },
   { name: 'Protez tırnak', duration_minutes: 90, price: 900, description: null },
