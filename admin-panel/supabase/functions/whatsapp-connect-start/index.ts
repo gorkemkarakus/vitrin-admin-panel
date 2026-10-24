@@ -37,6 +37,6 @@ Deno.serve(async (req) => {
     return json({ error: 'Bağlantı başlatılamadı, tekrar deneyin' }, 500)
   }
 
-  const site = (Deno.env.get('PUBLIC_SITE_URL') ?? 'https://www.adapptivdigital.com').replace(/\/$/, '')
+  const site = (Deno.env.get('PUBLIC_SITE_URL') ?? 'https://isletme.adapptivdigital.com').replace(/\/$/, '')
   return json({ data: { url: `${site}/whatsapp-baglan/?s=${token}&r=${returnTo}` } }, 200)
 })
