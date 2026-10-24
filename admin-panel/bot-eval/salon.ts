@@ -113,7 +113,7 @@ export class Salon {
             ? { starts_at: null, ends_at: null }
             : { starts_at: '09:00', ends_at: '19:00' }
           : null,
-      closed_day: state === 'kapali-tatil' ? { name: HOLIDAY.name } : null,
+      closed_day: state === 'kapali-tatil' ? { name: HOLIDAY.name } : state === 'arife' ? { name: HOLIDAY.name, eve_closes_at: '13:00' } : null,
     }
   }
 

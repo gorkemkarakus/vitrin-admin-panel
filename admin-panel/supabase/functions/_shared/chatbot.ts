@@ -97,6 +97,19 @@ const NOT_SURNAMES = new Set([
   'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi', 'pazar', 'öğlen', 'sabah', 'akşam',
 ])
 
+// "Randevuma 15 dk geç kalacağım" bir haber vermedir, saat degisikligi istegi
+// degil; model bunu 10:15'e tasima sanabiliyordu (testte 3'te 1). Musteri
+// acikca tasimak istemedikce randevuya dokunulmaz, salonu aramasi soylenir.
+export function lateNotice(parsed: Json, message: string, context: Json): string | null {
+  if (parsed.toolName !== 'reschedule_appointment') return null
+  if (!/geç kal|gecik/i.test(message)) return null
+  if (/alalım|alabilir|alır mısınız|değiştir|taşı|kaydır|ertele|yapalım|olsun/i.test(message)) return null
+  const phone = typeof context.business_phone === 'string' && context.business_phone ? context.business_phone : null
+  return phone
+    ? `Maalesef gecikmeyi buradan iletemiyorum, salona ${phone} numarasından haber verebilirsiniz.`
+    : 'Maalesef gecikmeyi buradan iletemiyorum, salonu arayarak haber verebilirsiniz.'
+}
+
 // Birden fazla aktif randevusu olan musteri "randevumu iptal et" deyip hangisi
 // oldugunu soylemezse (gun, tarih, saat, hizmet, calisan yok) model bazen
 // birini secip iptal ediyordu (gpt-6-luna, testte 8'de 3). Iptal geri
@@ -186,7 +199,11 @@ const MONTHS = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz'
 
 // Model musterinin yazim hatasini bazen aynen geri yaziyor ("hafaya Çarşamba
 // ... istediniz"); talimata ragmen kalan sik hatalar gondermeden once duzeltilir.
-const ECHOED_TYPOS: [RegExp, string][] = [[/\b(h)(?:afaya|aftya)(?![a-zçğıöşü])/gi, '$1aftaya']]
+const ECHOED_TYPOS: [RegExp, string][] = [
+  [/\b(h)(?:afaya|aftya)(?![a-zçğıöşü])/gi, '$1aftaya'],
+  // "Teşekkürler, Derya Kılıç." resmi duruyor; "Derya Hanım" gibi hitap kalir
+  [/^Teşekkürler,? [A-ZÇĞİÖŞÜ][a-zçğıöşü]+ [A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?<!Hanım|Bey)([.,!])/, 'Teşekkürler$1'],
+]
 export function fixEchoedTypos(reply: string): string {
   return ECHOED_TYPOS.reduce((s, [re, to]) => s.replace(re, to), reply)
 }
@@ -329,7 +346,8 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
     parsed.hasToolCall === true
       ? (askAboutEarlyHour(parsed, input.message, context) ??
         askForSurname(parsed, input.message, context) ??
-        askWhichCancel(parsed, input.message, context))
+        askWhichCancel(parsed, input.message, context) ??
+        lateNotice(parsed, input.message, context))
       : null
 
   let replyStep: Json

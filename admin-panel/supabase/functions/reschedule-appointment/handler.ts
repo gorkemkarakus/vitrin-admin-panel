@@ -4,7 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
 import { validateScheduledAt } from '../_shared/validation.ts'
-import { SLOT_MINUTES, isAvailable, eligibleDayHours, istanbulParts, istanbulDateString, toMinutes, findNextAvailable } from '../_shared/availability.ts'
+import { SLOT_MINUTES, isAvailable, eligibleDayHours, istanbulParts, toMinutes, findNextAvailable } from '../_shared/availability.ts'
+import { findClosedDay } from '../_shared/holidays.ts'
 
 // Musteri/chatbot'un var olan bir randevunun tarih/saatini degistirmesini
 // saglar. AYNI satirin UPDATE'i — iptal+yeniden olusturma DEGIL, cunku
@@ -137,16 +138,9 @@ export async function handler(req: Request): Promise<Response> {
   const isOutsideHours = !dayHours || startMin < toMinutes(dayHours.starts_at) || startMin + duration > toMinutes(dayHours.ends_at)
   const outsideHours = isOutsideHours ? (dayHours ?? { starts_at: null, ends_at: null }) : null
 
-  // Yeni gun salonun tatili mi? (book-appointment'taki gibi: tatil musaitlikte
-  // "Resmi Tatil" blogu oldugu icin cevap yoksa "dolu" gibi gorunuyordu.)
-  const { data: holidayRows } = await admin
-    .from('business_holidays')
-    .select('name')
-    .eq('business_id', business.id)
-    .lte('start_date', istanbulDateString(newStart))
-    .gte('end_date', istanbulDateString(newStart))
-    .limit(1)
-  const closedDay = holidayRows?.[0] ? { name: holidayRows[0].name as string } : null
+  // Yeni gun salonun tatili ya da arife kapanisindan sonrasi mi? (book-appointment'taki
+  // gibi: tatil musaitlikte blok oldugu icin cevap yoksa "dolu" gibi gorunuyordu.)
+  const closedDay = await findClosedDay(admin, business.id, newStart, duration)
 
   const next = findNextAvailable(newStart, [appt.employee_id], duration, scheds, otherAppts, blocks, SEARCH_DAYS)
   if (next) {

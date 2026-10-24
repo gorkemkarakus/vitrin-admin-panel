@@ -2,7 +2,7 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { askForSurname, askWhichCancel, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
+import { askForSurname, askWhichCancel, lateNotice, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
 import { isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
 
@@ -431,7 +431,7 @@ Deno.test('"tamam ayni tarihi soyluyorsun zaten uygun" sabit kalipli oneriyi ona
               { role: 'user', content: 'Uygun' },
               {
                 role: 'assistant',
-                content: 'O saat dolu. En yakın uygun saat: 30 Ekim 09:00 - Salon Çalışanı. Uygun mu?',
+                content: 'Maalesef o saat dolu. En yakın uygun saat: 30 Ekim 09:00 - Salon Çalışanı. Uygun mu?',
               },
             ],
           },
@@ -478,7 +478,7 @@ Deno.test('tatil gunu: "dolu" yerine "kapaliyiz" denir', async () => {
       ),
     ),
   )
-  assert(r.reply.startsWith('O gün Cumhuriyet Bayramı nedeniyle kapalıyız. En yakın uygun saat: 30 Ekim 09:00'), r.reply)
+  assert(r.reply.startsWith('Maalesef o gün Cumhuriyet Bayramı nedeniyle kapalıyız. En yakın uygun saat: 30 Ekim 09:00'), r.reply)
 })
 
 Deno.test('talimat: yer tutucu numara yok; salon telefonu ve kapali gunler eklenir', async () => {
@@ -634,4 +634,22 @@ Deno.test('iki randevu, hangisi belirsiz: iptal etmeden once sorulur', () => {
   assertEquals(askWhichCancel(cancel, '24 ündekini iptal et', ctx), null)
   assertEquals(askWhichCancel({ ...cancel, extraCancelIds: ['a2'] }, 'ikisini de iptal et', ctx), null)
   assertEquals(askWhichCancel(cancel, 'randevumu iptal et', { appointments: ctx.appointments.slice(0, 1) }), null)
+})
+
+Deno.test('gecikme haberi: randevu tasinmaz, salonu aramasi soylenir', () => {
+  const resch = { hasToolCall: true, toolName: 'reschedule_appointment', toolArgs: { appointment_id: 'a1', new_time: '10:15' } }
+  const ctx = { business_phone: '0362 555 12 34' }
+  assertEquals(
+    lateNotice(resch, 'yarınki randevuma 15 dk geç kalcam', ctx),
+    'Maalesef gecikmeyi buradan iletemiyorum, salona 0362 555 12 34 numarasından haber verebilirsiniz.',
+  )
+  assertEquals(lateNotice(resch, 'biraz gecikeceğim randevuyu yarım saat ileri alalım', ctx), null)
+  assertEquals(lateNotice(resch, 'randevumu 11e alalım', ctx), null)
+  assertEquals(lateNotice({ ...resch, toolName: 'cancel_appointment' }, 'geç kalcam iptal edin', ctx), null)
+})
+
+Deno.test('tesekkurde tam ad sadelesir, hitap kalir', () => {
+  assertEquals(fixEchoedTypos('Teşekkürler, Derya Kılıç. Telefon numaranızı da yazar mısınız?'), 'Teşekkürler. Telefon numaranızı da yazar mısınız?')
+  assertEquals(fixEchoedTypos('Teşekkürler Zeynep Kaya, telefon numaranızı da yazar mısınız?'), 'Teşekkürler, telefon numaranızı da yazar mısınız?')
+  assertEquals(fixEchoedTypos('Teşekkürler Derya Hanım, telefon numaranızı da yazar mısınız?'), 'Teşekkürler Derya Hanım, telefon numaranızı da yazar mısınız?')
 })

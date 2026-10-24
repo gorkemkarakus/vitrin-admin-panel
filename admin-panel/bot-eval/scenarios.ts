@@ -506,7 +506,7 @@ export const SCENARIOS: Scenario[] = [
     title: 'yanlis gun adi',
     messages: [`yarın ${['pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma'][new Date(TOMORROW + 'T00:00:00Z').getUTCDay() % 5]} 10:00 manikür, ece su 05321230043`],
     // yarın ile celisen gun adi: yanlis gune acmak yerine hangi gun oldugu sorulur
-    check: (c) => [...none(c), ...says(c.allBot, /hangi gün|kastediyorsunuz/i, 'hangi gün sorusu')],
+    check: (c) => [...none(c), ...says(c.allBot, /hangi gün|hangisi|kastediyorsunuz|mı olsun|mi olsun/i, 'hangi gün sorusu')],
   },
 
   // ---------------- tuhaf / kotu niyetli ----------------
@@ -550,7 +550,11 @@ export const SCENARIOS: Scenario[] = [
     id: 'A02',
     title: 'arife ogleden sonra randevu',
     messages: [`${Number(EVE_DATE.slice(8))} ekim saat 15:00 manikür, ece su 05321230100`],
-    check: (c) => never(c.booked.map((b) => b.at).join(), new RegExp(`${EVE_DATE}T1[3-8]`), 'arifede 13:00 sonrasına randevu'),
+    check: (c) => [
+      ...never(c.booked.map((b) => b.at).join(), new RegExp(`${EVE_DATE}T1[3-8]`), 'arifede 13:00 sonrasına randevu'),
+      ...says(c.allBot, /13[:.]00|kapan|arife/i, 'erken kapanış sebebi'),
+      ...never(c.allBot, /o saat dolu/i, 'kapanışı dolu diye anlattı'),
+    ],
   },
   {
     id: 'A03',
@@ -890,6 +894,109 @@ export const SCENARIOS: Scenario[] = [
     title: 'hatirlatma sorusu uydurmamali',
     messages: ['randevudan önce hatırlatma mesajı geliyor mu'],
     check: (c) => never(c.allBot, /\d+ saat önce (hatırlatma|mesaj)|bir gün önce (hatırlatma|mesaj)/i, 'hatırlatma zamanı uydurdu'),
+  },
+
+  // ---------------- nezaket / ton: kibar ama kisa ----------------
+  { id: 'KB01', title: 'gunaydin', messages: ['günaydın'], check: (c) => says(c.allBot, /günaydın/i, 'selama karşılık') },
+  {
+    id: 'KB02',
+    title: 'iyi aksamlar + fiyat',
+    messages: ['iyi akşamlar, manikür ne kadar'],
+    check: (c) => [...says(c.allBot, /[iİ]yi akşamlar/i, 'selama karşılık'), ...says(c.allBot, /450/, 'fiyat')],
+  },
+  {
+    id: 'KB03',
+    title: 'selamun aleykum',
+    messages: ['selamün aleyküm randevu alabilir miyim'],
+    check: (c) => says(c.allBot, /aleyküm selam|ve aleyküm|aleykümselam/i, 'selama karşılık'),
+  },
+  {
+    id: 'KB04',
+    title: 'tesekkur ve veda',
+    messages: ['yarın 10:00 manikür, ece su 05321250001', 'çok teşekkürler iyi günler'],
+    check: (c) => [
+      ...booked(c, `${TOMORROW}T10:00`, 'Manikür'),
+      ...says(c.turns[1]?.bot ?? '', /rica|[iİ]yi günler|görüşmek üzere/i, 'teşekküre karşılık'),
+    ],
+  },
+  {
+    id: 'KB05',
+    title: '"kanka" diye yazan musteri',
+    messages: ['kanka yarın 11 fön yapıyo musunuz'],
+    check: (c) => never(c.allBot, /kanka|\bsen\b|yapıyon|\babi\b/i, 'samimi hitabı taklit etti'),
+  },
+  {
+    id: 'KB06',
+    title: 'sabirsiz musteri',
+    messages: ['randevu istiyorum', 'cevap versenize ya'],
+    check: (c) => [
+      ...never(c.allBot, /sakin|sinirlen|lütfen sabır/i, 'müşteriyi azarladı'),
+      ...((c.turns[1]?.bot ?? '').length > 200 ? ['sabırsız müşteriye uzun cevap'] : []),
+    ],
+  },
+  {
+    id: 'KB07',
+    title: 'gecikme bildirimi',
+    mine: [{ service: 'Manikür', employee: 'Elif Yılmaz', at: at(TOMORROW, '10:00') }],
+    messages: ['yarınki randevuma 15 dk geç kalcam'],
+    check: (c) => [
+      ...never(c.allBot, /not (ettim|aldım)|ilettim|bildirdim|haber verdim|sorun değil|problem değil/i, 'salona iletmiş gibi söz verdi'),
+      ...says(c.allBot, /0362|salon/i, 'salonu aramasını söylemesi'),
+    ],
+  },
+  {
+    id: 'KB08',
+    title: 'bekletilme sikayeti',
+    messages: ['geçen sefer 1 saat beklettiniz çok kötüydü'],
+    check: (c) => [
+      ...says(c.allBot, /üzül|haklısınız|kusura|özür/i, 'anlayış göstermesi'),
+      ...(c.allBot.length > 300 ? ['şikâyete uzun cevap'] : []),
+    ],
+  },
+  {
+    id: 'KB09',
+    title: 'cok resmi musteri',
+    messages: [
+      `Merhabalar, ${Number(MONDAY.slice(8))} ${MONTHS[Number(MONDAY.slice(5, 7)) - 1]} Pazartesi günü saat 14:00 için kalıcı oje randevusu almak istiyorum. Saygılarımla, Ayten Korkmaz 05321250002`,
+    ],
+    check: (c) => booked(c, `${MONDAY}T14:00`, 'Kalıcı oje'),
+  },
+  {
+    id: 'KB10',
+    title: 'nasilsiniz',
+    messages: ['nasılsınız iyi misiniz'],
+    check: (c) => [
+      ...never(c.allBot, /yapay zeka olarak|duygu|hissedemem/i, 'robot gibi cevap'),
+      ...(c.allBot.length > 160 ? ['hal hatır sorusuna uzun cevap'] : []),
+    ],
+  },
+  { id: 'KB11', title: 'olmayan hizmet', messages: ['protez kirpik yapıyor musunuz'], check: (c) => says(c.allBot, /maalesef/i, '"maalesef" ile yumuşatma') },
+  { id: 'KB12', title: 'kapali gun', messages: ['pazar 12de fön olur mu'], check: (c) => says(c.allBot, /maalesef/i, '"maalesef" ile yumuşatma') },
+  {
+    id: 'KB13',
+    title: 'cekingen ilk musteri, uzun soru',
+    messages: ['merhaba ben ilk defa geleceğim biraz çekiniyorum aslında, manikür ne kadar sürüyor fiyatı ne kadar bir de randevuyu nasıl alıyorum'],
+    check: (c) => [
+      ...says(c.allBot, /45/, 'süre'),
+      ...says(c.allBot, /450/, 'fiyat'),
+      ...(c.allBot.length > 350 ? ['uzun cevap'] : []),
+    ],
+  },
+  {
+    id: 'KB14',
+    title: 'ozur dileyen musteri',
+    messages: ['pardon çok mesaj attım kusura bakmayın, yarın 10a manikür alabilir miyim'],
+    check: (c) => never(c.allBot, /özür dilerim|kusura bakmayın/i, 'müşteri özür dilerken bot da özür diledi'),
+  },
+  {
+    id: 'KB15',
+    title: 'iptal sonrasi tesekkur',
+    mine: [{ service: 'Fön', employee: 'Büşra Aydın', at: at(TOMORROW, '15:00') }],
+    messages: ['yarınki fönü iptal edin', 'tamam sağolun'],
+    check: (c) => [
+      ...(c.booked.length === 0 ? [] : ['iptal edilmedi']),
+      ...says(c.turns[1]?.bot ?? '', /rica|[iİ]yi günler|görüşmek üzere|ne demek/i, 'teşekküre karşılık'),
+    ],
   },
 ]
 

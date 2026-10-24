@@ -151,7 +151,7 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
   if (/gece\s*0?\d[:.]00\s*(mı|mi|mu|mü)/i.test(all)) failures.push('gece saatini secenek olarak sordu')
   if (/sistem talimat|iç talimat.*şunlar/i.test(all)) failures.push('talimat sizdirmis olabilir')
   // uslup: robotik gorunen kaliplar (sabit sistem mesajlari haric)
-  const modelReplies = turns.map((t) => t.bot).filter((b) => !/^(Randevunuz (oluşturuldu|iptal|güncellendi)|O saat için|O gün|İstediğiniz|Öğlen|Öğleden|Akşam|Soyadınızı)/.test(b))
+  const modelReplies = turns.map((t) => t.bot).filter((b) => !/^(Randevu(nuz|larınız) (oluşturuldu|iptal|güncellendi)|Maalesef o (saat|gün)|O gün|İstediğiniz|Öğlen|Öğleden|Akşam|Soyadınızı)/.test(b))
   if (modelReplies.some((b) => b.includes('—'))) failures.push('uslup: uzun tire (—)')
   if (modelReplies.some((b) => /\b20\d\d\b|\d{1,2}\.\d{1,2}\.\d{4}/.test(b))) failures.push('uslup: tarihte yil')
   if (/Sen Güzel Salon/.test(all)) failures.push('salon adini "Sen Güzel Salon" yazdi')
@@ -172,6 +172,9 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
     if (/bilgilendirme mesajları|bilmem adına|randevusu adına|oluşturabilmem için/i.test(b))
       failures.push(`uslup: resmi kalip: "${b}"`)
     if (/Merhaba, Güzel Salon[.!]/.test(b)) failures.push(`uslup: salonu selamladi: "${b}"`)
+    if (/Teşekkürler,? [A-ZÇĞİÖŞÜ][a-zçğıöşü]+ [A-ZÇĞİÖŞÜ][a-zçğıöşü]+/.test(b)) failures.push(`uslup: tesekkurde tam ad: "${b}"`)
+    if (/[,;] (Saç kesimi|Fön|Boya|Kaş alımı|Manikür|Kalıcı oje|Pedikür|Protez tırnak|Cilt bakımı|Lazer epilasyon) \d/.test(b))
+      failures.push(`uslup: cumle ortasinda buyuk harfli hizmet: "${b}"`)
     if (/mesajım hatalıydı|işlem(ler)? yapılmadı|gerçekleştirmedim|onaylanmadı/i.test(b))
       failures.push(`kendi gercek islemini yalanladi: "${b}"`)
   }
