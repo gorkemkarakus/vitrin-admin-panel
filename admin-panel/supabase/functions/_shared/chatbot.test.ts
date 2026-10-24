@@ -2,7 +2,7 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { askForSurname, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
+import { askForSurname, askWhichCancel, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
 import { isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
 
@@ -48,9 +48,10 @@ function fakeFetch(routes: Record<string, unknown>, calls: Call[]): typeof fetch
 
 const deps = (f: typeof fetch) => ({ supabaseUrl: BASE, anonKey: 'anon', botSecret: 'gizli', openaiKey: 'sk-test', fetch: f })
 
-const openaiText = (content: string) => ({ choices: [{ message: { content } }] })
+// /v1/responses cevap bicimi
+const openaiText = (text: string) => ({ output: [{ type: 'reasoning' }, { type: 'message', content: [{ type: 'output_text', text }] }] })
 const openaiTool = (name: string, args: Record<string, unknown>) => ({
-  choices: [{ message: { content: null, tool_calls: [{ function: { name, arguments: JSON.stringify(args) } }] } }],
+  output: [{ type: 'reasoning' }, { type: 'function_call', call_id: 'c1', name, arguments: JSON.stringify(args) }],
 })
 
 Deno.test('personel numarasi: komut asistaninin cevabi doner, musteri asistani calismaz', async () => {
@@ -96,9 +97,16 @@ Deno.test('sohbet: OpenAI cevabi gider, mesaj ve cevap kaydedilir', async () => 
   assertEquals(r.reply, 'Fön 250 TL.')
   const ai = calls.find((c) => c.url.includes('openai'))!
   assertEquals(ai.headers.Authorization, 'Bearer sk-test')
-  assertEquals(ai.body.model, 'gpt-5-mini')
-  assertEquals(ai.body.reasoning_effort, 'low')
-  const msgs = ai.body.messages as { role: string; content: string }[]
+  assert(ai.url.endsWith('/v1/responses'))
+  assertEquals(ai.body.model, 'gpt-6-luna')
+  assertEquals(ai.body.reasoning, { effort: 'medium' })
+  assertEquals(ai.body.store, false)
+  assertEquals((ai.body.tools as { type: string; name: string }[]).map((t) => `${t.type}:${t.name}`), [
+    'function:book_appointment',
+    'function:cancel_appointment',
+    'function:reschedule_appointment',
+  ])
+  const msgs = ai.body.input as { role: string; content: string }[]
   // sabit kurallar once (onbellek), salona ozel bilgiler ikinci mesajda
   assert(msgs[0].content.startsWith('Sen bir işletmenin WhatsApp/Instagram asistanısın.'))
   assert(!msgs[0].content.includes('Güzel Salon'))
@@ -180,6 +188,42 @@ Deno.test('randevu iptali: cancel-appointment cagrilir', async () => {
   assertEquals(r.reply, 'Randevunuz iptal edildi ✅\nFön - 23 Ekim 14:00 - Elif Yılmaz')
 })
 
+Deno.test('ikisini de iptal: her iptal cagrisi islenir, bos book_appointment yok sayilir', async () => {
+  const calls: Call[] = []
+  const twoCancels = {
+    output: [
+      { type: 'function_call', call_id: 'c0', name: 'book_appointment', arguments: '{"service_name":"","date":"","time":""}' },
+      { type: 'function_call', call_id: 'c1', name: 'cancel_appointment', arguments: '{"appointment_id":"apt-1"}' },
+      { type: 'function_call', call_id: 'c2', name: 'cancel_appointment', arguments: '{"appointment_id":"apt-2"}' },
+    ],
+  }
+  const r = await runChatbot(
+    { ...input, message: 'iki randevumu da iptal edin' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': context,
+          openai: twoCancels,
+          'cancel-appointment': {
+            status: 'cancelled',
+            appointment: { service_name: 'Fön', scheduled_at: '2026-10-23T11:00:00Z', employee_name: 'Elif Yılmaz' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  assertEquals(
+    calls.filter((c) => c.url.endsWith('cancel-appointment')).map((c) => c.body.appointment_id),
+    ['apt-1', 'apt-2'],
+  )
+  assert(!calls.some((c) => c.url.endsWith('book-appointment')))
+  assertEquals(r.reply, 'Randevularınız iptal edildi ✅\nFön - 23 Ekim 14:00 - Elif Yılmaz\nFön - 23 Ekim 14:00 - Elif Yılmaz')
+})
+
 Deno.test('saat degisikligi: reschedule-appointment cagrilir', async () => {
   const calls: Call[] = []
   const r = await runChatbot(
@@ -234,7 +278,7 @@ Deno.test('az once alinmis randevuya "evet": tekrar randevu acilmaz', async () =
   )
   await r.log
   assert(!calls.some((c) => c.url.endsWith('book-appointment')))
-  assertEquals(r.reply, 'Randevunuz zaten oluşturuldu, tekrar almanıza gerek yok. Başka bir konuda yardımcı olabilir miyim?')
+  assertEquals(r.reply, 'Randevunuz zaten oluşturuldu, tekrar almanıza gerek yok.')
 })
 
 Deno.test('OpenAI hatasi: hata firlar (webhook musteriye bir sey gondermez)', async () => {
@@ -387,7 +431,7 @@ Deno.test('"tamam ayni tarihi soyluyorsun zaten uygun" sabit kalipli oneriyi ona
               { role: 'user', content: 'Uygun' },
               {
                 role: 'assistant',
-                content: 'O saat için uygun değiliz (dolu). En yakın uygun saat: 30 Ekim 09:00 - Salon Çalışanı. Uygun mu?',
+                content: 'O saat dolu. En yakın uygun saat: 30 Ekim 09:00 - Salon Çalışanı. Uygun mu?',
               },
             ],
           },
@@ -434,7 +478,7 @@ Deno.test('tatil gunu: "dolu" yerine "kapaliyiz" denir', async () => {
       ),
     ),
   )
-  assert(r.reply.startsWith('O gün (Cumhuriyet Bayramı) kapalıyız. En yakın uygun saat: 30 Ekim 09:00'), r.reply)
+  assert(r.reply.startsWith('O gün Cumhuriyet Bayramı nedeniyle kapalıyız. En yakın uygun saat: 30 Ekim 09:00'), r.reply)
 })
 
 Deno.test('talimat: yer tutucu numara yok; salon telefonu ve kapali gunler eklenir', async () => {
@@ -455,7 +499,7 @@ Deno.test('talimat: yer tutucu numara yok; salon telefonu ve kapali gunler eklen
       ),
     )
     const ai = calls.find((c) => c.url.includes('openai'))!
-    const msgs = ai.body.messages as { role: string; content: string }[]
+    const msgs = ai.body.input as { role: string; content: string }[]
     return msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
   }
   const withPhone = await promptFor({
@@ -574,4 +618,20 @@ Deno.test('yazim hatasi tekrari: "hafaya" cevapta "haftaya" olur', () => {
   assertEquals(fixEchoedTypos('Hafaya Çarşamba, yani 28 Ekim için manikür.'), 'Haftaya Çarşamba, yani 28 Ekim için manikür.')
   assertEquals(fixEchoedTypos('hafaya cuma ve haftya salı'), 'haftaya cuma ve haftaya salı')
   assertEquals(fixEchoedTypos('Haftaya görüşürüz, şafaya değil'), 'Haftaya görüşürüz, şafaya değil')
+})
+
+Deno.test('iki randevu, hangisi belirsiz: iptal etmeden once sorulur', () => {
+  const ctx = {
+    appointments: [
+      { id: 'a1', service_name: 'Manikür', employee_name: 'Elif Yılmaz', scheduled_at: '2026-10-24T07:00:00Z' },
+      { id: 'a2', service_name: 'Boya', employee_name: 'Büşra Aydın', scheduled_at: '2026-10-26T11:00:00Z' },
+    ],
+  }
+  const cancel = { hasToolCall: true, toolName: 'cancel_appointment', toolArgs: { appointment_id: 'a1' } }
+  assertEquals(askWhichCancel(cancel, 'randevumu iptal et', ctx), 'Hangi randevunuzu iptal edeyim: 24 Ekim manikür mü, 26 Ekim boya mı?')
+  assertEquals(askWhichCancel(cancel, 'yarınki randevumu iptal edin', ctx), null)
+  assertEquals(askWhichCancel(cancel, 'manikürü iptal et', ctx), null)
+  assertEquals(askWhichCancel(cancel, '24 ündekini iptal et', ctx), null)
+  assertEquals(askWhichCancel({ ...cancel, extraCancelIds: ['a2'] }, 'ikisini de iptal et', ctx), null)
+  assertEquals(askWhichCancel(cancel, 'randevumu iptal et', { appointments: ctx.appointments.slice(0, 1) }), null)
 })

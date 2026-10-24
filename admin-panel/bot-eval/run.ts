@@ -22,6 +22,17 @@ if (!openaiKey) {
 // kullanim: run.ts [filtre] [--tekrar=3]
 const repeatArg = Deno.args.find((a) => a.startsWith('--tekrar='))
 const REPEAT = repeatArg ? Math.max(1, Number(repeatArg.split('=')[1]) || 1) : 1
+// model karsilastirmasi: --model=gpt-5.6-luna --effort=low (bot kodu degismez,
+// sadece OpenAI'a giden istekte model/reasoning degistirilir)
+const argVal = (name: string) => Deno.args.find((a) => a.startsWith(`--${name}=`))?.split('=')[1]
+const MODEL = argVal('model')
+const EFFORT = argVal('effort')
+// 1M token fiyatlari: girdi, onbellekli girdi, cikti
+const PRICES: Record<string, [number, number, number]> = {
+  'gpt-5-mini': [0.25, 0.025, 2],
+  'gpt-6-luna': [0.1, 0.01, 0.5],
+  'gpt-5.6-luna': [0.2, 0.02, 1.2],
+}
 const filterArg = Deno.args.find((a) => !a.startsWith('--'))
 const filter = filterArg ? new RegExp(filterArg, 'i') : null
 const BASE = 'https://sahte.supabase.co'
@@ -62,13 +73,23 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
   const fakeFetch = (async (url: string | URL, init?: RequestInit) => {
     const u = String(url)
     if (u.includes('api.openai.com')) {
+      if (MODEL || EFFORT) {
+        const req = JSON.parse(String(init?.body))
+        if (MODEL) req.model = MODEL
+        if (EFFORT) req.reasoning = { effort: EFFORT }
+        init = { ...init, body: JSON.stringify(req) }
+      }
       const res = await fetch(url, init)
       const j = await res.clone().json().catch(() => null)
+      // --debug: modelin cagirdigi fonksiyonlari yaz
+      if (Deno.args.includes('--debug')) {
+        for (const o of j?.output ?? []) if (o.type === 'function_call') console.log(`  [${sc.id}] ${o.name} ${o.arguments}`)
+      }
       if (j?.usage) {
         usage.calls++
-        usage.prompt += j.usage.prompt_tokens ?? 0
-        usage.cached += j.usage.prompt_tokens_details?.cached_tokens ?? 0
-        usage.completion += j.usage.completion_tokens ?? 0
+        usage.prompt += j.usage.input_tokens ?? 0
+        usage.cached += j.usage.input_tokens_details?.cached_tokens ?? 0
+        usage.completion += j.usage.output_tokens ?? 0
       }
       return res
     }
@@ -137,6 +158,23 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
   if (/["“”']Güzel Salon["“”']/.test(all)) failures.push('salon adini tirnakla yazdi')
   if (/onaylarsanız randevu/i.test(all)) failures.push('uslup: "onaylarsanız randevunuzu alayım" vaadi')
   if (modelReplies.some((b) => b.length > 500)) failures.push('uslup: 500+ karakterlik cevap')
+  // konusma sekli (sabit sablonlar dahil): islev dogru olsa da gercek bir salon calisani boyle yazmaz
+  for (const b of turns.map((t) => t.bot)) {
+    const sentences = b.split(/(?<=[.?!])\s+/)
+    if (/\p{L}+(mişsiniz|mışsınız|muşsunuz|müşsünüz)\b/iu.test(b)) failures.push(`uslup: -mişsiniz kipi: "${b}"`)
+    if (sentences.some((s) => !s.trim().endsWith('?') && /\b(istediniz|istiyorsunuz|istemişsiniz|istermişsiniz)\b/i.test(s)))
+      failures.push(`uslup: istegi geri ozetledi: "${b}"`)
+    if (/başka (bir )?(konuda|şey|isteğiniz|sorunuz)|yardımcı olayım mı|yardımcı olabileceğim başka/i.test(b))
+      failures.push(`uslup: kapanis teklifi: "${b}"`)
+    if ((b.match(/\?/g) ?? []).length > 1) failures.push(`uslup: birden fazla soru: "${b}"`)
+    if (/\(/.test(b)) failures.push(`uslup: parantez: "${b}"`)
+    if (/not aldım/i.test(b)) failures.push(`uslup: "not aldım": "${b}"`)
+    if (/bilgilendirme mesajları|bilmem adına|randevusu adına|oluşturabilmem için/i.test(b))
+      failures.push(`uslup: resmi kalip: "${b}"`)
+    if (/Merhaba, Güzel Salon[.!]/.test(b)) failures.push(`uslup: salonu selamladi: "${b}"`)
+    if (/mesajım hatalıydı|işlem(ler)? yapılmadı|gerçekleştirmedim|onaylanmadı/i.test(b))
+      failures.push(`kendi gercek islemini yalanladi: "${b}"`)
+  }
   if (/\bid:|randevu-\d/i.test(all)) failures.push('musteriye ic kimlik (id) yazdi')
   return { id: sc.id, title: sc.title, turns, failures, ms }
 }
@@ -160,8 +198,9 @@ const passed = results.filter((r) => !r.failures.length).length
 const allMs = results.flatMap((r) => r.ms).sort((a, b) => a - b)
 const median = allMs[Math.floor(allMs.length / 2)] ?? 0
 console.log(`\n${passed}/${results.length} gecti · cevap suresi medyan ${(median / 1000).toFixed(1)} sn`)
-// gpt-5-mini: girdi $0.25/M, onbellekli girdi $0.025/M, cikti $2/M
-const cost = ((usage.prompt - usage.cached) * 0.25 + usage.cached * 0.025 + usage.completion * 2) / 1e6
+const [pIn, pCached, pOut] = PRICES[MODEL ?? 'gpt-6-luna'] ?? PRICES['gpt-6-luna']
+const cost = ((usage.prompt - usage.cached) * pIn + usage.cached * pCached + usage.completion * pOut) / 1e6
+console.log(`model: ${MODEL ?? 'gpt-6-luna'} · reasoning: ${EFFORT ?? 'medium'}`)
 console.log(
   `OpenAI: ${usage.calls} istek · girdi ${usage.prompt} token (%${usage.prompt ? Math.round((usage.cached / usage.prompt) * 100) : 0} onbellekten) · cikti ${usage.completion} · ~$${cost.toFixed(3)} (istek basi ~$${(cost / Math.max(1, usage.calls)).toFixed(4)})`,
 )
@@ -197,6 +236,6 @@ section.fail{border-left-color:#dc2626}h2{font-size:15px;margin:0 0 8px}.why{col
 small{display:block;color:#6b7280;font-size:11px;margin-top:4px}</style>
 <h1>Bot testi — ${passed}/${results.length} geçti · medyan ${(median / 1000).toFixed(1)} sn</h1>
 ${rows}`
-const out = `${home}/Desktop/Adapptiv-bot-testi.html`
+const out = `${home}/Desktop/Adapptiv-bot-testi${MODEL ? '-' + MODEL : ''}${EFFORT ? '-' + EFFORT : ''}.html`
 await Deno.writeTextFile(out, html)
 console.log('rapor:', out)

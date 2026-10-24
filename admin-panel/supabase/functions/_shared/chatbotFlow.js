@@ -112,28 +112,32 @@ const closedDaysList = (context.closed_days || [])
 // DEGISEN isletme bilgileri (ad, tarih, hizmetler, randevular...). Sabit
 // metne salona/gune ozel hicbir sey yazilmamali, yoksa onbellek bozulur.
 const staticSystemPrompt = `Sen bir işletmenin WhatsApp/Instagram asistanısın. İşletmenin adı, bugünün tarihi, hizmetler, çalışanlar, çalışma saatleri ve bu müşterinin randevuları en alttaki İŞLETME BİLGİLERİ bölümündedir (işletmenin adını orada yazıldığı gibi kullan: tırnak içine alma, başına/sonuna kelime ekleme). Müşterilerle Türkçe, samimi ve kısa cümlelerle konuş.
-ÜSLUP (her mesajda uy):
-- Gerçek bir salon çalışanı WhatsApp'tan nasıl yazarsa öyle yaz: kısa (çoğunlukla 1-3 cümle), doğal, sıcak. Müşteriye "siz" diye hitap et.
-- Uzun tire (—), parantez içi açıklama ve madde imi kullanma; emoji kullanma (müşteri kullanırsa en fazla bir tane).
-- Müşterinin verdiği bilgileri tek tek geri sayma ("not aldım: tarih ..., saat ..., ad ..., tel ..." gibi özet YAPMA); sadece eksik olanı sor ya da işlemi yap.
+ÜSLUP (her mesajda uy; randevunun doğru alınması kadar konuşmanın doğal olması da önemli):
+- Gerçek bir salon çalışanı WhatsApp'tan nasıl yazarsa öyle yaz: kısa (çoğunlukla 1-2 cümle), sade, sıcak, günlük Türkçe. Müşteriye "siz" diye hitap et.
+- Bir mesajda EN FAZLA BİR soru sor (mesajda tek soru işareti olsun). Birden fazla bilgi eksikse tek soruda birleştir, ör. "Adınız soyadınız ve telefon numaranız nedir?".
+- Müşterinin söylediğini ona geri anlatma: "manikür istiyorsunuz", "... istediniz", "... istermişsiniz", "not aldım" gibi özet cümleleri KURMA; doğrudan eksik olanı sor ya da işlemi yap. "-mişsiniz" kipini hiç kullanma.
+- Ad ve telefonu kısa iste: "Adınız soyadınız ve telefon numaranız nedir?", "Telefon numaranızı da yazar mısınız?". "Randevuyu oluşturabilmem için", "... yapabilmem adına", "bilgilendirme mesajları için" gibi resmi kalıplar kullanma.
+- Tarihi her mesajda tekrarlama. "Yarın", "haftaya çarşamba" gibi göreceli bir gün ilk konuşulduğunda bir kez kesin tarihle yaz (ör. "28 Ekim Çarşamba"), sonraki mesajlarda tekrar yazma.
+- Cümleyi tam kur; "Yarın 24 Ekim için manikür randevusu." gibi yüklemsiz yarım cümle yazma.
+- Uzun tire (—), parantez ve madde imi kullanma; emoji kullanma (müşteri kullanırsa en fazla bir tane).
 - Tarihte yılı yazma ("24 Ekim" yeter) ve tarihi "24.10.2026" gibi rakamla yazma.
 - Hizmetler sorulursa yalnızca adını ve fiyatını kısa satırlarla yaz (ör. "Manikür 450 TL"); süre ve açıklamayı ancak sorulursa söyle.
-- Mesajı ya müşteriye sorduğun tek soruyla ya da verdiğin bilgiyle bitir; sonuna genel bir kapanış/yardım teklifi cümlesi EKLEME.
-- Randevuyu ancak sistem onayladıktan sonra "oluşturuldu" diye bildir; müşteriye teklif ederken "Uygun mu?" gibi kısa bir soru sor.
+- Mesajı soruyla ya da verdiğin bilgiyle bitir; "Başka yardımcı olabileceğim bir şey var mı?", "Başka bir konuda yardımcı olabilir miyim?" gibi kapanış/yardım teklifi cümlesi ASLA ekleme.
+- Randevuyu ancak sistem onayladıktan sonra "oluşturuldu" diye bildir. Müsaitliği sistem söylemeden "uygun", "boş", "yer var" deme. "Onaylarsanız randevunuzu alayım" gibi vaat cümleleri kurma: eksik bilgi varsa sadece onu sor, bilgiler tamamsa fonksiyonu çağır.
 - Sağlık/yaralanma konularında (kanama, kırık tırnak, alerji reaksiyonu, ağrı vb.) geçmiş olsun de ve en fazla 1-2 kısa cümlelik basit bir ilk yardım önerisi ver (madde listesi YAPMA); durum ciddiyse doktora başvurmasını söyle, istersen salonda yapılabilecekleri tek cümleyle ekle.
 - Müşteri fotoğraf/görsel göndermeyi teklif ederse: görselleri göremediğini kısaca söyle, istediğini yazmasını rica et.
 - Sistemde olmayan salon bilgilerini (ödeme yöntemi, kredi kartı, taksit, otopark, kampanya, indirim, iptal/gelmeme ücreti, adres) ASLA uydurma; bilmediğini söyle ve salonu aramasını öner.
 - İki kelimelik ad soyad (ör. "ece su", "can er") tam addır; soyad isteme.
 - Müşterinin yazım hatalarını cevabında tekrarlama (ör. müşteri "hafaya" yazdıysa sen "haftaya" diye düzgün yaz); her kelimeyi doğru yazımıyla kullan.
-- "Yarın", "haftaya çarşamba" gibi göreceli bir gün konuşulduğunda cevabında onu bir kez kesin tarihle yaz (ör. "28 Ekim Çarşamba"); böylece müşteri hangi günün anlaşıldığını görür.
-- "Onaylarsanız randevunuzu alayım" gibi söz/vaat cümleleri kurma: eksik bilgi varsa sadece onu sor, bilgiler tamamsa fonksiyonu çağır.
+- Selamlaşmada salon adını kullanacaksan "Merhaba, [salon adı]'na hoş geldiniz" gibi kur; "Merhaba, [salon adı]." diye salonu selamlar gibi yazma.
+- Doğal cevap örnekleri: müşteri "randevu lazım" → "Tabii, hangi hizmet için?"; "manikür, yarın" → "Yarın saat kaçta gelmek istersiniz?"; "10 olsun" → "Adınız soyadınız ve telefon numaranız nedir?"; "zeynep kaya" → "Telefon numaranızı da yazar mısınız?".
 Kurallar:
 - Müşteri randevu almak istiyorsa ve hizmet + tarih + saat + tam ad + telefon bilgisi TAMAMSA, book_appointment fonksiyonunu HEMEN çağır. Müşteri bir çalışan tercihi BELİRTMEDİYSE bunu bekleme sebebi yapma, employee_name'i boş bırakıp yine de HEMEN çağır — "çalışan tercihiniz var mı?" diye sormak için asla durma. MÜSAİTLİK KARARI SANA AİT DEĞİL: İŞLETME BİLGİLERİ bölümündeki çalışma saatleri listesini SADECE genel bilgi sorularına (ör. "kaçta açıksınız?") cevap vermek için kullan — randevu taleplerinde ASLA kullanma. İstenen saat listedeki çalışma saatleriyle uyuşmuyor GÖRÜNSE bile (ör. liste 19:00'da kapanıyor yazsa ve müşteri 22:00 istese bile), kendi kendine "bu saat çalışma saatleri dışında, alamıyorum" diyerek ASLA reddetme ve "randevunuzu alıyorum" diye YAZIP fonksiyonu çağırmadan da bırakma — hizmet+tarih+saat+tam ad+telefon TAMAMSA, saat ne kadar sıra dışı/imkansız görünürse görünsün, book_appointment'ı HER ZAMAN HEMEN çağır; müsait olup olmadığına, hangi çalışanın uygun olduğuna ve alternatif önermeye SADECE backend (fonksiyonun kendisi) karar verir, sen değil.
 - AD/TELEFON KURALI — ÖNCE ŞUNU KONTROL ET: İŞLETME BİLGİLERİ bölümünde "Bu müşteri sohbetin daha önceki bir noktasında şu bilgiyi vermiş olabilir" başlıklı bir not VAR MI?
   * O not VARSA: customer_full_name ve customer_contact_phone alanlarına o nottaki değerleri DOĞRUDAN yaz, müşteriye ASLA "adınızı/telefonunuzu tekrar alabilir miyim" diye SORMA — bu durumda soru sormak KESİNLİKLE YASAK, bilgi zaten elinde.
-  * O not YOKSA: önce sohbet geçmişine bak; müşteri tam adını ve telefonunu bu sohbette daha önce yazmışsa (ör. ilk mesajında, önceki bir randevu için) onları kullan ve TEKRAR SORMA. Hiç yazmadıysa book_appointment çağırmadan önce müşterinin TAM ADI SOYADI ve bilgilendirme mesajları için kullanılacak GERÇEK TELEFON NUMARASINI sor — tek isim yeterli değil, tam ad soyad iste. Bu bilgiler olmadan book_appointment'ı çağırma.
+  * O not YOKSA: önce sohbet geçmişine bak; müşteri tam adını ve telefonunu bu sohbette daha önce yazmışsa (ör. ilk mesajında, önceki bir randevu için) onları kullan ve TEKRAR SORMA. Hiç yazmadıysa book_appointment çağırmadan önce müşterinin TAM ADINI SOYADINI ve GERÇEK TELEFON NUMARASINI tek soruda sor — tek isim yeterli değil, tam ad soyad iste. Bu bilgiler olmadan book_appointment'ı çağırma.
 - Eksik bilgi (ör. ad/telefon/saat) beklerken müşteri sana YENİ bir şey söylerse (bir düzeltme, ek detay, soru — ne olursa olsun), bir önceki mesajınla NEREDEYSE BİREBİR AYNI cümleyi TEKRARLAMA; bu müşteriye "beni dinlemiyor" hissi verir. Müşterinin az önce söylediğine kısaca değin (ör. "tamam, perşembe olarak güncelledim") ve SADECE gerçekten hâlâ eksik olan bilgiyi iste, cümleyi her seferinde biraz farklı kur.
-- "Randevunuzu oluşturmak için hizmet, tarih ve saat bilgisini aldım" gibi GENEL/ÖZETLEYİCİ bir onay cümlesi ASLA kurma — müşteri o üç bilginin (hizmet, tarih, saat) TAMAMINI henüz vermediyse bu YALAN olur (ör. müşteri sadece "yarın için randevu istiyorum" dediyse ne hizmet ne saat vermiştir, sadece tarih vermiştir). Bu özellikle müşteri TEK KELİMELİK/ÇOK KISA bir cevap verdiğinde (ör. önceki mesajında sadece "pedikür" ya da "manikür" gibi TEK bir hizmet adı yazdıysa) da GEÇERLİDİR — kısa bir cevap olması bu kuralı ASLA gevşetmez; o an elinde hâlâ sadece hizmet bilgisi varsa (tarih/saat konuşulmadıysa), yine SADECE hizmeti not aldığını söyle, "tarih ve saat bilgisini de aldım" gibi bir şey ASLA ekleme. Bunun yerine SADECE gerçekten elinde olan bilgiyi belirt, SADECE gerçekten eksik olanları AÇIKÇA ve TEK TEK sor (ör. "Hangi hizmeti istersiniz? Saat kaçta gelmek istersiniz?").
+- "Randevunuzu oluşturmak için hizmet, tarih ve saat bilgisini aldım" gibi GENEL/ÖZETLEYİCİ bir onay cümlesi ASLA kurma — müşteri o üç bilginin (hizmet, tarih, saat) TAMAMINI henüz vermediyse bu YALAN olur (ör. müşteri sadece "yarın için randevu istiyorum" dediyse ne hizmet ne saat vermiştir, sadece tarih vermiştir). Bu özellikle müşteri TEK KELİMELİK/ÇOK KISA bir cevap verdiğinde (ör. önceki mesajında sadece "pedikür" ya da "manikür" gibi TEK bir hizmet adı yazdıysa) da GEÇERLİDİR — kısa bir cevap olması bu kuralı ASLA gevşetmez; o an elinde hâlâ sadece hizmet bilgisi varsa (tarih/saat konuşulmadıysa), yine SADECE hizmeti not aldığını söyle, "tarih ve saat bilgisini de aldım" gibi bir şey ASLA ekleme. Bunun yerine SADECE gerçekten elinde olan bilgiyi belirt, SADECE gerçekten eksik olanları AÇIKÇA ve TEK TEK sor (ör. "Hangi hizmet için, saat kaçta gelmek istersiniz?").
 - book_appointment çağırırken service_name alanına SADECE "Hizmet adı" değerini gönder — süre veya fiyat bilgisini asla ekleme. Müşterinin tarif ettiği hizmet (ör. "bakım", "güzellik işlemi", "bir şeyler" gibi genel/belirsiz bir ifade) İŞLETME BİLGİLERİ bölümündeki hizmet listesindeki HİÇBİR isimle açıkça eşleşmiyorsa, kendi başına en yakın gördüğün hizmete SESSİZCE karar VERİP book_appointment çağırma — müşteriye listedeki hizmetleri sayıp hangisini istediğini SOR, cevabını bekle.
 - Müşteri belirli bir çalışan istiyorsa (isimle ya da "kadın/erkek olsun" gibi tercihle) İŞLETME BİLGİLERİ bölümündeki çalışan listesinden uygun birini employee_name alanına yaz. İŞLETME BİLGİLERİ bölümündeki çalışan listesinde bir çalışanın yanında (Kadın) veya (Erkek) yazıyorsa bu GERÇEK, çalışanın kendi belirttiği bilgidir — cinsiyet tercihi olan müşteri için bu bilgiye göre KESİN ve GÜVENLE seç/cevap ver, "emin değilim" deme. Ama bir çalışanın yanında böyle bir etiket YOKSA (sistemde belirtilmemiş), o çalışan için ismin yaygın kullanımına göre makul bir tahminde bulunabilirsin AMA bunu KESİN bilgiymiş gibi sunma — müşteri sonradan "gerçekten kadın/erkek mi" diye sorarsa "evet/hayır" gibi KESİN bir cevap UYDURMA (yalan bilgi vermek olur), sadece tahmin ettiğini ve kesin bilginin işletmede olduğunu söyle.
 - MÜŞTERİNİN KENDİ ADI ile ÇALIŞAN TERCİHİNİ KARIŞTIRMA: mesajda geçen bir ad soyad, müşteri onu AÇIKÇA bir çalışan tercihi olarak söylemediği sürece (ör. "Elif'le olsun", "Kerem bey yapsın", "Selin hanımdan", "X ile") MÜŞTERİNİN KENDİ ADIDIR (randevu kimin adına alınacak). Özellikle telefon numarasıyla yan yana yazılan ad soyad (ör. "yarın 10 manikür ayşe yılmaz 0532...") HER ZAMAN müşterinin adıdır — bunu çalışan sanıp "salonumuzda çalışmıyor" DEME; customer_full_name alanına yaz ve devam et. Bu ad bir çalışanla AYNI İLK ADI taşısa bile (ör. salonda "Elif Yılmaz" varken müşteri "elif su 0532..." yazarsa) müşterinin kendi adıdır; "çalışan tercihi mi?" diye SORMA.
@@ -156,11 +160,13 @@ Kurallar:
   (c) Müşteri "öğlen", "öğleden sonra", "akşamüstü", "akşam", "iş çıkışı", "mesai sonrası" gibi bir gün bölümüyle DAKİKASIZ bir saat söylemişse (ör. "öğlen 1", "akşamüstü 5", "akşam 7", "akşam 3", "iş çıkışı 6 gibi"), bu saat NETTİR: rakam 12'den küçükse +12 ekle (öğlen 1 = 13:00, akşamüstü 5 = 17:00, akşam 7 = 19:00, akşam 3 = 15:00; öğlen 12 = 12:00) ve SORU SORMADAN, ayrıca onay istemeden devam et. "Sabah" ile söylenen saat (ör. "sabah 10", "sabah 9") olduğu gibi kullanılır.
 - Şu anda tek seferde SADECE TEK bir hizmet/randevu alınabiliyor. Müşteri birden fazla hizmet veya randevu istiyorsa (ör. "manikür ve pedikür istiyorum" gibi iki hizmet BİRLİKTE, YA DA kendisi için bir hizmet + bir arkadaşının/yakınının için ayrı bir hizmet), bunu ASLA sessizce sadece BİRİNE indirip ikincisini hiç belirtmeden atlama — müşteri ikincisinin de alındığını sanıp yanılabilir, bu ciddi bir güven sorunu yaratır. Cevabının bir yerinde MUTLAKA kısaca belirt (ör. "Şu an tek seferde sadece bir randevu alabiliyorum, önce [ilk hizmet/kişi] için ayarlıyorum; [ikinci hizmet/kişi] için ayrı bir mesaj yazar mısınız?"). İLK istenen hizmet için hizmet+tarih+saat+tam ad+telefon zaten TAMAMSA, ek bir onay BEKLEMEDEN book_appointment fonksiyonunu bu mesaj içinde HEMEN çağır (sadece metinle "ilkini alıyorum/onaylıyor musunuz" deyip fonksiyonu çağırmadan bırakma) — ikinci hizmeti ilk randevu tamamlandıktan sonra ayrı bir mesajda alacağını söyle. Müşteri zaten "evet/onaylıyorum" gibi bir onay verdiyse, aynı açıklamayı TEKRAR ETME, doğrudan book_appointment'ı çağır. Asla toplam süre/fiyat hesaplayıp tek seferde hepsini alacakmış gibi konuşma.
 - Müşteri VAR OLAN bir randevusunun TARİHİNİ/SAATİNİ değiştirmek isterse reschedule_appointment, İPTAL etmek isterse cancel_appointment fonksiyonunu çağır — id değerini SADECE İŞLETME BİLGİLERİ bölümündeki "Bu müşterinin aktif randevuları" listesinden al, asla uydurma. SADECE ÇALIŞANI değiştirmek isterse (ör. "aynı gün kalsın ama başka bir kuaförle olsun") bu konuda yardımcı olamayacağını söyle ve salonun telefon numarasından işletmeyle doğrudan iletişime geçmesini iste — bu istisna SADECE çalışan değişikliği içindir, tarih/saat değişikliği/iptal DEĞİL. Bir randevunun GERÇEKTEN var olup olmadığını İŞLETME BİLGİLERİ bölümündeki listeye bakarak öğren — listede YOKSA randevu yoktur (müşteri sadece bir ÖNERİ almış ama onaylamamış olabilir, ör. "En yakın uygun saat: ... Uygun mu?" HENÜZ bir randevu DEĞİLDİR) — bu durumda müşteriyi aramaya yönlendirme, sadece durumu netleştir. Müşterinin bahsettiği randevu listede BİRDEN FAZLA aday ile eşleşiyorsa ve müşteri hangisini kastettiğini AÇIKÇA belirtmediyse, fonksiyonu ÇAĞIRMADAN ÖNCE hangisini kastettiğini sor — id'yi tahmin ederek/rastgele seçerek ASLA çağırma.
+- Sohbet geçmişinde ✅ ile biten "Randevunuz oluşturuldu", "Randevunuz güncellendi", "Randevunuz iptal edildi", "Randevularınız iptal edildi" mesajları sistemin GERÇEKTEN yaptığı işlemin onayıdır. Bunlardan şüphe etme, "önceki mesajım hatalıydı" ya da "işlem yapılmadı" deme. İptal edilen randevunun aktif listede görünmemesi normaldir; müşteri sonra "evet/tamam" derse kısaca işlemin yapıldığını söyle.
+- Müşteri birden fazla randevusunu iptal etmek isterse ("ikisini de iptal edin") her randevu için ayrı cancel_appointment çağır. İptal isteğinde book_appointment ASLA çağırma.
 - Randevu id değerleri yalnızca senin iç kullanımın içindir: müşteriye yazdığın mesajlarda ASLA id gösterme ("id: ..." gibi).
 - Müşterinin aktif randevu listesinde TEK randevu varsa ve müşteri "randevumu ... alalım / iptal et" diyorsa hangi randevu olduğunu SORMA; doğrudan o randevu için reschedule_appointment / cancel_appointment çağır.
-- Sistemin "İstediğiniz yeni saat için uygun değiliz. En yakın uygun saat: ... Uygun mu?" ya da "O gün kapalıyız. Randevunuzu taşımak için en yakın uygun saat: ... Uygun mu?" önerisi bir SAAT DEĞİŞİKLİĞİ önerisidir: müşteri onaylarsa (olur/evet/tamam) YENİ randevu açma ve ad/telefon SORMA; reschedule_appointment'ı aynı randevu id'si ve önerideki tarih/saatle çağır.
+- Sistemin "... Randevunuzu taşımak için en yakın uygun saat: ... Uygun mu?" önerisi bir SAAT DEĞİŞİKLİĞİ önerisidir: müşteri onaylarsa (olur/evet/tamam) YENİ randevu açma ve ad/telefon SORMA; reschedule_appointment'ı aynı randevu id'si ve önerideki tarih/saatle çağır.
 - Müşteri sadece kendi adını veya telefon numarasını düzeltmek isterse (ör. "aslında adım X değil Y", "telefon numaramı yanlış söylemişim"), bunu YUKARIDAKİ İPTAL KURALIYLA KARIŞTIRMA — bu bir iptal/değişiklik talebi DEĞİLDİR. Düzeltmeyi nazikçe kabul et ("Tamam, notumu güncelledim: Y") ve sohbetin geri kalanında düzeltilmiş bilgiyi kullan.
-- Müşteri HENÜZ GERÇEK bir randevusu OLUŞMAMIŞKEN (book_appointment hiç çağrılmadıysa, YA DA çağrıldı ama backend SADECE bir alternatif saat ÖNERDİ ve müşteri bunu henüz onaylamadıysa) "vazgeçtim/iptal edelim/boşver" derse, bunu da YUKARIDAKİ İPTAL KURALIYLA KARIŞTIRMA — ortada iptal edilecek GERÇEK bir randevu yok, bu yüzden müşteriyi işletmeyi aramaya YÖNLENDİRME. Sadece bu talebi bıraktığını kısaca onayla (ör. "Tamam, bu talebi iptal ediyorum, başka bir konuda yardımcı olabilir miyim?") ve book_appointment çağırma. AMA müşteri "vazgeçtim" derken AYNI mesajda yeni bir tarih/saat/hizmet bilgisi de veriyorsa (ör. "vazgeçtim, 27 Temmuz Pazartesi olsun"), bu bir İPTAL DEĞİL bir DEĞİŞİKLİK talebidir — eski bilgiyi yok sayıp yeni verilen bilgiyle devam et (eksik bir şey varsa kısaca sor, hepsi tamamsa book_appointment'ı çağır); bu durumda talebi tamamen iptal ettiğini söyleyip durma.
+- Müşteri HENÜZ GERÇEK bir randevusu OLUŞMAMIŞKEN (book_appointment hiç çağrılmadıysa, YA DA çağrıldı ama backend SADECE bir alternatif saat ÖNERDİ ve müşteri bunu henüz onaylamadıysa) "vazgeçtim/iptal edelim/boşver" derse, bunu da YUKARIDAKİ İPTAL KURALIYLA KARIŞTIRMA — ortada iptal edilecek GERÇEK bir randevu yok, bu yüzden müşteriyi işletmeyi aramaya YÖNLENDİRME. Sadece bu talebi bıraktığını kısaca onayla (ör. "Tamam, bu talebi iptal ettim.") ve book_appointment çağırma. AMA müşteri "vazgeçtim" derken AYNI mesajda yeni bir tarih/saat/hizmet bilgisi de veriyorsa (ör. "vazgeçtim, 27 Temmuz Pazartesi olsun"), bu bir İPTAL DEĞİL bir DEĞİŞİKLİK talebidir — eski bilgiyi yok sayıp yeni verilen bilgiyle devam et (eksik bir şey varsa kısaca sor, hepsi tamamsa book_appointment'ı çağır); bu durumda talebi tamamen iptal ettiğini söyleyip durma.
 - Bilgi eksikse (hangi hizmet, hangi gün, hangi saat) fonksiyonu çağırmadan önce kısaca sor.
 - Müşteri "müsait mi / boş mu / yer var mı" diye sorarsa: müsaitliğe sistem ancak randevu denerken bakabilir. Hizmet belli değilse ÖNCE hangi hizmeti istediğini sor; "kontrol edeyim" deyip bekletme.
 - "yarın", "pazartesi" gibi göreceli ifadeleri bugünün tarihine göre kesin bir tarihe çevir. "Ayın 31'i", "ayın 5'inde" gibi ifadeler İÇİNDE BULUNDUĞUMUZ ayı kasteder (o gün bu ay geçtiyse gelecek ayı); "hangi ayın?" diye SORMA. Müşterinin zaten açıkça verdiği saat, ad ve telefonu ayrıca "doğru mu?" diye tekrar onaylatma.
@@ -262,21 +268,12 @@ const tools = [
   },
 ];
 
-// gpt-5-mini reasoning_effort belirtilmezse VARSAYILAN 'medium' kullanir —
-// basit sohbet/randevu gorevleri icin gereksiz yavas (10-20+ sn/mesaj, test
-// edilip dogrulandi: 'Call OpenAI' node'u tek basina 20+ sn suruyordu).
-// Once 'low' denenip, canli testte musteri eksik bilgi (ad/telefon)
-// beklenirken duzeltme yaptiginda botun ONCEKI mesajiyla BIREBIR AYNI
-// sablon cumleyi tekrarlama egilimi gozlenince GERI ALINMISTI. Kok nedeni
-// arastirilinca bu tekrar sorununun reasoning_effort'tan BAGIMSIZ oldugu
-// (varsayilan 'medium' ile de ayni sablon cikabiliyordu, test edilip
-// dogrulandi) ve asil nedenin promptta "eksik bilgi beklerken musteri bir
-// sey soylerse ONCEKI cumleyi TEKRARLAMA" kuralinin EKSIK olmasi oldugu
-// bulundu — o kural asagida ayrica eklendi ve 4/4 canli testte tekrar
-// sorununu cozdugu dogrulandi. Kok neden cozuldukten sonra 'low' tekrar
-// denenip AYNI 4/4 testte (kural ile birlikte) sorun cikmadigi
-// dogrulanip GERI ETKINLESTIRILDI.
-return [{ json: { model: 'gpt-5-mini', messages, tools, tool_choice: 'auto', reasoning_effort: 'low' } }];
+// gpt-5-mini 2026-12-11'de kapaniyor. gpt-6-luna 147 senaryoda karsilastirildi:
+// reasoning 'none'/'low' iken iki randevudan birini sormadan iptal etmek, olmayan
+// calisani baskasiyla degistirmek gibi hatalar yapti; 'medium' 3 turda 441/441
+// gecti, gpt-5-mini'den ~5 kat ucuz ve ~3 kat hizli. Istek chatbot.ts'te
+// /v1/responses'a cevrilir (Luna fonksiyon + reasoning'i chat/completions'ta kabul etmiyor).
+return [{ json: { model: 'gpt-6-luna', messages, tools, tool_choice: 'auto', reasoning_effort: 'medium' } }];
 }
 
 // n8n: "Parse OpenAI Response"
@@ -304,15 +301,35 @@ const justBooked = lastAssistantMsg && /^Randevunuz oluşturuldu ✅/.test((last
 const isBareConfirmation = bareConfirmationRe.test(webhookData.message.trim()) || isConfirmationMessage(webhookData.message);
 
 if (toolCalls && toolCalls.length > 0 && justBooked && isBareConfirmation) {
-  return [{ json: { hasToolCall: false, chatReply: 'Randevunuz zaten oluşturuldu, tekrar almanıza gerek yok. Başka bir konuda yardımcı olabilir miyim?' } }];
+  return [{ json: { hasToolCall: false, chatReply: 'Randevunuz zaten oluşturuldu, tekrar almanıza gerek yok.' } }];
 }
 
 if (toolCalls && toolCalls.length > 0) {
-  const args = JSON.parse(toolCalls[0].function.arguments);
-  return [{ json: { hasToolCall: true, toolArgs: args, toolName: toolCalls[0].function.name } }];
+  // gpt-6-luna "ikisini de iptal edin" deyince ayni anda birden fazla
+  // cancel_appointment gonderiyor (yanina bazen bos bir book_appointment da
+  // ekliyor). Iptal varsa iptal secilir, diger iptal id'leri de islenir.
+  const calls = toolCalls.map((c) => {
+    let args = {};
+    try { args = JSON.parse(c.function.arguments || '{}'); } catch (e) {}
+    return { name: c.function.name, args };
+  // hizmet, tarih ve saati bos book_appointment cagrisi anlamsiz (model iptal
+  // isteginin yanina ekleyebiliyor); musteriye "telefonunuzu alamadim" gitmesin
+  }).filter((c) => !(c.name === 'book_appointment' && !c.args.service_name && !c.args.date && !c.args.time));
+  if (calls.length === 0) {
+    return [{ json: { hasToolCall: false, chatReply: (message && message.content) || 'Tam olarak ne yapmamı istersiniz?' } }];
+  }
+  const cancels = calls.filter((c) => c.name === 'cancel_appointment');
+  const chosen = cancels[0] || calls[0];
+  // Birden fazla iptal ancak musteri acikca coklu isterse ("ikisini de",
+  // "hepsini", "randevularımı"); tekil "randevumu iptal et" en fazla bir iptal.
+  const wantsMany = /iki|ikisi|hepsi|tümü|tamamı|bütün|randevular/i.test(webhookData.message);
+  const extraCancelIds = wantsMany
+    ? [...new Set(cancels.slice(1).map((c) => c.args.appointment_id))].filter((id) => id && id !== chosen.args.appointment_id)
+    : [];
+  return [{ json: { hasToolCall: true, toolArgs: chosen.args, toolName: chosen.name, extraCancelIds } }];
 }
 
-return [{ json: { hasToolCall: false, chatReply: (message && message.content) || 'Üzgünüm, şu an cevap veremiyorum.' } }];
+return [{ json: { hasToolCall: false, chatReply: (message && message.content) || 'Şu an cevap veremiyorum, birazdan tekrar yazar mısınız?' } }];
 }
 
 // n8n: "Build Booking Request"
@@ -552,8 +569,7 @@ function tryDateCandidate(day, monthIdx, explicitYear) {
   }
   if (!dateWarning) {
     const monthDisplay = monthStems[monthIdx].charAt(0).toUpperCase() + monthStems[monthIdx].slice(1);
-    const yearDisplay = explicitYear || candidate.getUTCFullYear();
-    dateWarning = `Belirttiğiniz tarih (${day} ${monthDisplay} ${yearDisplay}) gerçekte var olmuyor. Lütfen geçerli bir tarih belirtir misiniz?`;
+    dateWarning = `${day} ${monthDisplay} diye bir tarih yok, başka bir gün söyler misiniz?`;
   }
   return false;
 }
@@ -753,6 +769,19 @@ const mentionsStatedWeekday = toolArgs.stated_weekday && messagesToCheck.some((m
   return words.some((w) => fuzzyMatchDay(w) === toolArgs.stated_weekday.toLowerCase());
 });
 const weekdayNote = mentionsStatedWeekday && toolArgs.stated_weekday !== actualWeekday ? actualWeekday : null;
+// "yarın salı" gibi goreceli gun + celisen gun adi: hangisinin kastedildigi
+// belirsiz. Yanlis gune randevu acip not dusmek yerine randevu acilmadan sorulur
+// (yanlis gun riski, bir soru daha sormaktan pahali).
+let weekdayConflict = null;
+if (weekdayNote && /(?<![a-zçğıöşü])(yarın|yarin|bugün|bugun|öbür gün|yarından sonra)(?![a-zçğıöşü])/i.test(webhookData.message || '')) {
+  const monthsTr = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  const nowIst = new Date(Date.now() + 3 * 3600000);
+  const todayUtc = Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate());
+  const delta = ((weekdayNames.indexOf(toolArgs.stated_weekday) - nowIst.getUTCDay() + 7) % 7) || 7;
+  const statedDate = new Date(todayUtc + delta * 86400000);
+  const askedDate = new Date(finalDate + 'T00:00:00Z');
+  weekdayConflict = `${askedDate.getUTCDate()} ${monthsTr[askedDate.getUTCMonth()]} ${actualWeekday} günü, ${toolArgs.stated_weekday.toLocaleLowerCase('tr')} ise ${statedDate.getUTCDate()} ${monthsTr[statedDate.getUTCMonth()]}. Hangi gün olsun?`;
+}
 
 // LLM "ayrıca [baska tarih] icin de [baska hizmet] istiyorum" gibi bir
 // GUNCELLEME mesajinda tarih/saati dogru guncelleyip hizmeti YANLISLIKLA
@@ -919,8 +948,8 @@ return [{
     employee_name: confirmedSuggestion?.employee || toolArgs.employee_name || undefined,
     scheduled_at: scheduledAt,
     source_note: 'WhatsApp asistanı',
-    weekday_note: weekdayNote,
-    date_warning: !explicitDate ? dateWarning : null,
+    weekday_note: weekdayConflict ? null : weekdayNote,
+    date_warning: weekdayConflict || (!explicitDate ? dateWarning : null),
     recurring_note: messagesToCheck.some((m) => /\bher\s+(hafta|ay|gün|hafta[ıi]|ay[ıi])\b|sürekli|düzenli\s+olarak|tekrar\s*eden|tekrarlayan/i.test(m || '')) ? true : null,
     multi_booking_note: multiBookingNote,
   },
@@ -972,17 +1001,17 @@ if (result.status === 'booked') {
   if (result.closed_day) {
     // Tatil (bayram vb.): "dolu" demek yaniltici; musteri ayni saati
     // onaylayip donguye giriyordu.
-    unavailablePrefix = `O gün${result.closed_day.name ? ' (' + result.closed_day.name + ')' : ''} kapalıyız.`;
+    unavailablePrefix = `O gün${result.closed_day.name ? ' ' + result.closed_day.name + ' nedeniyle' : ''} kapalıyız.`;
   } else if (result.outside_hours) {
     unavailablePrefix = result.outside_hours.starts_at
-      ? `İstediğiniz saatte çalışma saatlerimiz dışındayız (o gün ${result.outside_hours.starts_at}-${result.outside_hours.ends_at} arası açığız).`
+      ? `O gün ${result.outside_hours.starts_at}-${result.outside_hours.ends_at} arası açığız, o saate randevu veremiyoruz.`
       : `O gün${bookedServiceName ? ' ' + bookedServiceName + ' için' : ''} açık değiliz.`;
   } else {
-    unavailablePrefix = 'O saat için uygun değiliz (dolu).';
+    unavailablePrefix = 'O saat dolu.';
   }
   reply = `${unavailablePrefix} En yakın uygun saat: ${display}${result.suggestion.employee_name ? ' - ' + result.suggestion.employee_name : ''}. Uygun mu?`;
 } else if (result.status === 'no_availability') {
-  reply = 'Üzgünüm, önümüzdeki günlerde uygun bir saat bulamadım. Farklı bir tarih deneyebilir misiniz?';
+  reply = 'Önümüzdeki günlerde boş saat bulamadım, başka bir tarih söyler misiniz?';
 } else {
   // book-appointment KENDI JSON gövdesinde her zaman string bir 'error' alanı
   // döner (400/404/500 dahil) — HTTP node'da neverError açık olduğu için bu
@@ -1000,9 +1029,9 @@ if (result.status === 'booked') {
   // tekrar sormali). Digerlerinin (once alinan hizmet/tarih/saat) kaybolmadigi
   // acikca belirtiliyor ki musteri "bastan mi basliyoruz" sanmasin.
   if (errMsg === 'Geçerli bir telefon numarası giriniz (ör. 0532 123 45 67)') {
-    reply = 'Randevu bilgilerinizi aldım, sadece telefon numaranızı net alamadım. Tekrar paylaşır mısınız? (ör. 0532 123 45 67)';
+    reply = 'Telefon numaranızı tam alamadım, 0532 123 45 67 gibi tekrar yazar mısınız?';
   } else if (errMsg === 'Geçmiş bir tarih/saat için randevu oluşturulamaz') {
-    reply = 'Belirttiğiniz tarih/saat geçmişte kalıyor görünüyor. Lütfen ileride bir tarih ve saat belirtir misiniz?';
+    reply = 'O saat geçti, başka bir gün ya da saat söyler misiniz?';
   } else if (errMsg === 'scheduled_at geçersiz') {
     // book-appointment, n7'nin gecerli-saat araligindaki ("saat HH:MM") regex'i
     // yakalamadigi (ör. musteri "25:99" gibi TAMAMEN gecersiz bir saat yazdiginda,
@@ -1010,16 +1039,21 @@ if (result.status === 'booked') {
     // hata stringini dondurur - musteriye DOGRUDAN gosterilirse ingilizce-teknik
     // gorunup kafa karistirir (test edilip dogrulandi). Diger tarih/telefon
     // hatalarinda oldugu gibi musteri-dostu bir Turkce mesaja ceviriyoruz.
-    reply = 'Belirttiğiniz saat geçerli görünmüyor. Lütfen geçerli bir saat belirtir misiniz (ör. 14:00)?';
+    reply = 'Saati anlayamadım, 14:00 gibi yazar mısınız?';
   } else if (errMsg) {
-    reply = errMsg;
+    // Tarih uyarilari (date_warning) ve salonun kurallari (gunluk limit, online
+    // randevu kapali, calisan bu hizmeti vermiyor) musteriye anlamli; yalniz
+    // teknik hatalar ("Geçersiz istek gövdesi" vb.) gosterilmez.
+    reply = /gövde|API anahtar|Method not allowed|HTTP|scheduled_at|_id|zorunlu|undefined|null/i.test(errMsg)
+      ? 'Randevuyu şu an oluşturamadım, birazdan tekrar dener misiniz?'
+      : errMsg;
   } else {
-    reply = 'Üzgünüm, randevunuzu oluştururken teknik bir sorun yaşadım. Lütfen tekrar dener misiniz?';
+    reply = 'Randevuyu şu an oluşturamadım, birazdan tekrar dener misiniz?';
   }
 }
 
 if (weekdayNote) {
-  reply = `Not: Belirttiğiniz tarih aslında bir ${weekdayNote} günü.\n\n` + reply;
+  reply = `Bilginize, o gün ${weekdayNote}.\n\n` + reply;
 }
 if ($('Build Booking Request').item.json.recurring_note) {
   reply = reply + '\n\nNot: Şu an sadece tek seferlik randevu alabiliyoruz — düzenli/tekrarlayan bir randevu için her seferinde ayrı mesaj göndermeniz gerekiyor.';
@@ -1167,7 +1201,7 @@ if (dayNum && monthMatch && statedDay) {
   // GECERSIZ TARIH olarak isaretleyip net bir hata metni gosteriyoruz.
   if (!isNaN(dateObj.getTime()) && dateObj.getUTCMonth() !== monthIdx) {
     const monthDisplay = monthStem.charAt(0).toUpperCase() + monthStem.slice(1);
-    reply = `${dayNum} ${monthDisplay} diye bir tarih yok. Lütfen geçerli bir tarih belirtir misiniz?`;
+    reply = `${dayNum} ${monthDisplay} diye bir tarih yok, başka bir gün söyler misiniz?`;
   } else if (!isNaN(dateObj.getTime())) {
     const actualWeekday = weekdayNames[dateObj.getUTCDay()];
     const statedCap = statedDay.charAt(0).toUpperCase() + statedDay.slice(1);
@@ -1246,9 +1280,11 @@ if (falseCompletionClaim.test(reply) && !hasActiveAppointment && !/^Randevunuz z
   // ETMIYORUZ — sadece KOSULLU ("tamamsa"/"varsa") ifadeler kullaniyoruz, bu
   // yuzden mesaj HANGI bilgi gercekten eksik olursa olsun ASLA yalan olmaz.
   if (hasName && hasPhone) {
-    reply = 'Bilgilerinizi güncelledim. Randevu için gereken hizmet, tarih, saat, adınız ve telefon numaranızın hepsi tamamsa "evet" yazar mısınız? Eksik veya yanlış bir şey varsa belirtin, hemen düzelteyim.';
+    reply = 'Randevunuz henüz oluşmadı. Hizmet, gün ve saat doğruysa "evet" yazar mısınız?';
+  } else if (hasName || hasPhone) {
+    reply = hasName ? 'Randevunuz henüz oluşmadı. Telefon numaranızı da yazar mısınız?' : 'Randevunuz henüz oluşmadı. Adınızı soyadınızı da yazar mısınız?';
   } else {
-    reply = 'Bilgilerinizi güncelledim. Randevu oluşturmak için hâlâ eksik olan bir bilgi varsa (hizmet, tarih, saat, tam adınız veya telefon numaranız) belirtir misiniz?';
+    reply = 'Randevunuz henüz oluşmadı. Adınızı soyadınızı ve telefon numaranızı yazar mısınız?';
   }
 }
 
@@ -1284,7 +1320,7 @@ if (result.status === 'cancelled') {
   reply = `Randevunuz iptal edildi ✅\n${result.appointment.service_name || 'Hizmet'} - ${display}${result.appointment.employee_name ? ' - ' + result.appointment.employee_name : ''}`;
 } else {
   const errMsg = typeof result.error === 'string' ? result.error : null;
-  reply = errMsg || 'Üzgünüm, randevunuzu iptal ederken teknik bir sorun yaşadım. Lütfen tekrar dener misiniz?';
+  reply = errMsg || 'Randevuyu şu an iptal edemedim, birazdan tekrar dener misiniz?';
 }
 return [{ json: { reply, customer_phone: webhookData.from, message: webhookData.message } }];
 }
@@ -1526,8 +1562,7 @@ function tryDateCandidate(day, monthIdx, explicitYear) {
   }
   if (!dateWarning) {
     const monthDisplay = monthStems[monthIdx].charAt(0).toUpperCase() + monthStems[monthIdx].slice(1);
-    const yearDisplay = explicitYear || candidate.getUTCFullYear();
-    dateWarning = `Belirttiğiniz tarih (${day} ${monthDisplay} ${yearDisplay}) gerçekte var olmuyor. Lütfen geçerli bir tarih belirtir misiniz?`;
+    dateWarning = `${day} ${monthDisplay} diye bir tarih yok, başka bir gün söyler misiniz?`;
   }
   return false;
 }
@@ -1686,22 +1721,25 @@ if (result.status === 'rescheduled') {
 } else if (result.status === 'unavailable') {
   const { display } = fmt(result.suggestion.scheduled_at);
   const who = result.suggestion.employee_name ? ' - ' + result.suggestion.employee_name : '';
-  // tatil gunune tasima: "uygun değiliz" (dolu gibi) yerine kapali oldugu soylenir.
-  // Ikinci cumle yeni randevu onerisinden ("En yakın uygun saat") farkli kalmali:
-  // chatbot.ts confirmedReschedule onayi bu metinden taniyor.
-  reply = result.closed_day
-    ? `O gün${result.closed_day.name ? ' (' + result.closed_day.name + ')' : ''} kapalıyız. Randevunuzu taşımak için en yakın uygun saat: ${display}${who}. Uygun mu?`
-    : `İstediğiniz yeni saat için uygun değiliz. En yakın uygun saat: ${display}${who}. Uygun mu?`;
+  // Sebep (tatil / mesai disi / dolu) acikca soylenir. Ikinci cumle yeni randevu
+  // onerisinden ("En yakın uygun saat") farkli kalmali: chatbot.ts
+  // confirmedReschedule onayi bu metinden taniyor.
+  const why = result.closed_day
+    ? `O gün${result.closed_day.name ? ' ' + result.closed_day.name + ' nedeniyle' : ''} kapalıyız.`
+    : result.outside_hours && result.outside_hours.starts_at
+      ? `O gün ${result.outside_hours.starts_at}-${result.outside_hours.ends_at} arası açığız.`
+      : 'O saat dolu.';
+  reply = `${why} Randevunuzu taşımak için en yakın uygun saat: ${display}${who}. Uygun mu?`;
 } else if (result.status === 'no_availability') {
-  reply = 'Üzgünüm, önümüzdeki günlerde uygun bir saat bulamadım. Farklı bir tarih deneyebilir misiniz?';
+  reply = 'Önümüzdeki günlerde boş saat bulamadım, başka bir tarih söyler misiniz?';
 } else {
   const errMsg = typeof result.error === 'string' ? result.error : null;
-  reply = errMsg === 'scheduled_at geçersiz' ? 'Belirttiğiniz saat geçerli görünmüyor. Lütfen geçerli bir saat belirtir misiniz (ör. 14:00)?'
-    : errMsg === 'Geçmiş bir tarih/saat için randevu oluşturulamaz' ? 'Belirttiğiniz tarih/saat geçmişte kalıyor görünüyor. Lütfen ileride bir tarih ve saat belirtir misiniz?'
-    : errMsg || 'Üzgünüm, randevunuzu güncellerken teknik bir sorun yaşadım. Lütfen tekrar dener misiniz?';
+  reply = errMsg === 'scheduled_at geçersiz' ? 'Saati anlayamadım, 14:00 gibi yazar mısınız?'
+    : errMsg === 'Geçmiş bir tarih/saat için randevu oluşturulamaz' ? 'O saat geçti, başka bir gün ya da saat söyler misiniz?'
+    : errMsg || 'Randevuyu şu an güncelleyemedim, birazdan tekrar dener misiniz?';
 }
 if (weekdayNote) {
-  reply = `Not: Belirttiğiniz tarih aslında bir ${weekdayNote} günü.\n\n` + reply;
+  reply = `Bilginize, o gün ${weekdayNote}.\n\n` + reply;
 }
 return [{ json: { reply, customer_phone: webhookData.from, message: webhookData.message } }];
 }

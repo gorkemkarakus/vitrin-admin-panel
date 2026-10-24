@@ -10,6 +10,7 @@
 //                          -> cancel / reschedule / book fonksiyonu + cevap
 //   chatbot-log-message    -> musteri mesaji + cevap kaydi
 import * as flow from './chatbotFlow.js'
+import { fromResponsesResponse, toResponsesRequest } from './openaiResponses.ts'
 
 export interface ChatbotInput {
   business_id: string
@@ -96,6 +97,44 @@ const NOT_SURNAMES = new Set([
   'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi', 'pazar', 'öğlen', 'sabah', 'akşam',
 ])
 
+// Birden fazla aktif randevusu olan musteri "randevumu iptal et" deyip hangisi
+// oldugunu soylemezse (gun, tarih, saat, hizmet, calisan yok) model bazen
+// birini secip iptal ediyordu (gpt-6-luna, testte 8'de 3). Iptal geri
+// alinamaz; once sorulur.
+export function askWhichCancel(parsed: Json, message: string, context: Json): string | null {
+  if (parsed.toolName !== 'cancel_appointment') return null
+  if (((parsed.extraCancelIds as unknown[] | undefined) ?? []).length) return null
+  const appts = (Array.isArray(context.appointments) ? context.appointments : []) as {
+    service_name?: string
+    employee_name?: string
+    scheduled_at?: string
+  }[]
+  if (appts.length < 2) return null
+  const text = message.toLocaleLowerCase('tr')
+  const words = [
+    ...appts.flatMap((a) => [a.service_name, a.employee_name?.split(' ')[0]]),
+    ...MONTHS,
+    'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi', 'pazar',
+    'yarın', 'bugün', 'haftaya', 'ilk', 'son', 'birinci', 'ikinci', 'sabah', 'öğle', 'akşam',
+  ]
+    .filter((w): w is string => !!w)
+    .map((w) => w.toLocaleLowerCase('tr'))
+  if (/\d/.test(text) || words.some((w) => text.includes(w))) return null
+  const list = appts.map((a) => {
+    const d = new Date(new Date(String(a.scheduled_at)).getTime() + 3 * 3600000)
+    const month = MONTHS[d.getUTCMonth()]
+    const item = `${d.getUTCDate()} ${month[0].toLocaleUpperCase('tr')}${month.slice(1)} ${String(a.service_name ?? 'randevu').toLocaleLowerCase('tr')}`
+    return `${item} ${questionParticle(item)}`
+  })
+  return `Hangi randevunuzu iptal edeyim: ${list.join(', ')}?`
+}
+
+// soru eki son unluye uyar: boya mı, manikür mü, fön mü, kaş alımı mı
+function questionParticle(word: string): string {
+  const last = [...word.toLocaleLowerCase('tr')].reverse().find((ch) => 'aıoueiöü'.includes(ch))
+  return last === 'e' || last === 'i' ? 'mi' : last === 'o' || last === 'u' ? 'mu' : last === 'ö' || last === 'ü' ? 'mü' : 'mı'
+}
+
 // Musteri soyadini yazdiysa (mesajinda adin yaninda bir kelime daha var ya da
 // "Soyadınızı da yazar mısınız?" sorusuna tek kelimeyle cevap verdi) tam ad
 // burada birlestirilir ve toolArgs'a yazilir; yoksa soru doner.
@@ -152,7 +191,7 @@ export function fixEchoedTypos(reply: string): string {
   return ECHOED_TYPOS.reduce((s, [re, to]) => s.replace(re, to), reply)
 }
 
-// Saat degisikligi onerisi ("İstediğiniz yeni saat için uygun değiliz. En yakın
+// Saat degisikligi onerisi ("O saat dolu. Randevunuzu taşımak için en yakın
 // uygun saat: 24 Ekim 15:00 - Elif. Uygun mu?"; tatil gunu icin "O gün (X)
 // kapalıyız. Randevunuzu taşımak için en yakın uygun saat: ...") onaylandiysa ve musterinin
 // tek aktif randevusu varsa, modele sormadan o randevu onerilen saate tasinir.
@@ -264,10 +303,11 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
     outputs['Parse OpenAI Response'] = parsed
   } else {
     const openaiRequest = run('Build OpenAI Request', flow.buildOpenAIRequest as Step, context)
-    const openaiResponse = await timed(
-      'openai',
-      postJson(f, 'https://api.openai.com/v1/chat/completions', { Authorization: `Bearer ${deps.openaiKey}` }, openaiRequest, 30000, false),
-    )
+    const askOpenAI = async (req: Json) =>
+      fromResponsesResponse(
+        await postJson(f, 'https://api.openai.com/v1/responses', { Authorization: `Bearer ${deps.openaiKey}` }, toResponsesRequest(req), 30000, false),
+      )
+    const openaiResponse = await timed('openai', askOpenAI(openaiRequest))
     parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, openaiResponse)
     const misread = misreadCustomerName(parsed, input.message)
     if (misread) {
@@ -281,16 +321,15 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
           },
         ],
       }
-      const retry = await timed(
-        'openai-tekrar',
-        postJson(f, 'https://api.openai.com/v1/chat/completions', { Authorization: `Bearer ${deps.openaiKey}` }, retryRequest, 30000, false),
-      )
+      const retry = await timed('openai-tekrar', askOpenAI(retryRequest))
       parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, retry)
     }
   }
   const guardQuestion =
     parsed.hasToolCall === true
-      ? (askAboutEarlyHour(parsed, input.message, context) ?? askForSurname(parsed, input.message, context))
+      ? (askAboutEarlyHour(parsed, input.message, context) ??
+        askForSurname(parsed, input.message, context) ??
+        askWhichCancel(parsed, input.message, context))
       : null
 
   let replyStep: Json
@@ -299,9 +338,20 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
   } else if (parsed.hasToolCall !== true) {
     replyStep = run('Build Reply From Chat', flow.buildReplyFromChat as Step, parsed)
   } else if (parsed.toolName === 'cancel_appointment') {
-    const req = run('Build Cancel Request', flow.buildCancelRequest as Step, parsed)
-    const result = await timed('islem', fn('cancel-appointment', req, 15000, true))
-    replyStep = run('Build Reply From Cancel', flow.buildReplyFromCancel as Step, result)
+    // "ikisini de iptal edin": modelin gonderdigi her iptal sirayla yapilir
+    const ids = [parsed.toolArgs, ...((parsed.extraCancelIds as string[] | undefined) ?? []).map((id) => ({ appointment_id: id }))]
+    const replies: string[] = []
+    for (const toolArgs of ids) {
+      const req = run('Build Cancel Request', flow.buildCancelRequest as Step, { ...parsed, toolArgs })
+      const result = await timed('islem', fn('cancel-appointment', req, 15000, true))
+      replies.push(String(run('Build Reply From Cancel', flow.buildReplyFromCancel as Step, result).reply ?? ''))
+    }
+    const head = 'Randevunuz iptal edildi ✅\n'
+    const merged =
+      replies.length > 1 && replies.every((r) => r.startsWith(head))
+        ? 'Randevularınız iptal edildi ✅\n' + replies.map((r) => r.slice(head.length)).join('\n')
+        : replies.filter(Boolean).join('\n\n')
+    replyStep = { ...outputs['Build Reply From Cancel'], reply: merged }
   } else if (parsed.toolName === 'reschedule_appointment') {
     const req = run('Build Reschedule Request', flow.buildRescheduleRequest as Step, parsed)
     if (reschedule) {

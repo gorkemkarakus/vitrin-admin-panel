@@ -77,7 +77,7 @@ export const SCENARIOS: Scenario[] = [
     messages: ['lazer epilasyon acıtır mı kaç seans lazım'],
     check: (c) => says(c.allBot, new RegExp(`${SALON_PHONE.replace(/ /g, '\\s?')}|bilmiyor|bilgim yok|emin değil|net bilgi`, 'i'), 'bilmediğini söylemesi / salon telefonu'),
   },
-  { id: 'B05', title: 'kapanis saati', messages: ['akşam kaça kadar açıksınız'], check: (c) => says(c.allBot, /19[:.]00|19'?a|saat 19|19.00/, '19:00') },
+  { id: 'B05', title: 'kapanis saati', messages: ['akşam kaça kadar açıksınız'], check: (c) => says(c.allBot, /19[:.]00|19'?a|saat 19|19.00|7[’']ye|akşam 7/, '19:00') },
   { id: 'B06', title: 'pazar acik mi', messages: ['pazar açıkmısınız'], check: (c) => says(c.allBot, /kapalı|çalışmıyor|açık değil/i, 'pazar kapalı') },
   {
     id: 'B07',
@@ -386,7 +386,7 @@ export const SCENARIOS: Scenario[] = [
   },
 
   // ---------------- hizmet sorulari ----------------
-  { id: 'Q01', title: 'kalici oje kac gun', messages: ['kalıcı oje kaç gün gidiyo'], check: (c) => says(c.allBot, /2.?-?.?3 hafta|iki üç hafta|2 ile 3/i, '2-3 hafta') },
+  { id: 'Q01', title: 'kalici oje kac gun', messages: ['kalıcı oje kaç gün gidiyo'], check: (c) => says(c.allBot, /2.?-?.?3 hafta|iki üç hafta|2 ile 3|14.?-.?21 gün/i, '2-3 hafta') },
   { id: 'Q02', title: 'eski oje sokumu', messages: ['eski kalıcı ojeyi çıkarmak ücretli mi'], check: (c) => says(c.allBot, /ücretsiz/i, 'söküm ücretsiz') },
   { id: 'Q03', title: 'cilt bakimi paketi', messages: ['cilt bakımının paketi var mı'], check: (c) => says(c.allBot, /6|altı/i, '6 seanslık paket') },
   {
@@ -505,7 +505,8 @@ export const SCENARIOS: Scenario[] = [
     id: 'Y04',
     title: 'yanlis gun adi',
     messages: [`yarın ${['pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma'][new Date(TOMORROW + 'T00:00:00Z').getUTCDay() % 5]} 10:00 manikür, ece su 05321230043`],
-    check: (c) => ifBooked(c, [`${TOMORROW}T10:00`]),
+    // yarın ile celisen gun adi: yanlis gune acmak yerine hangi gun oldugu sorulur
+    check: (c) => [...none(c), ...says(c.allBot, /hangi gün|kastediyorsunuz/i, 'hangi gün sorusu')],
   },
 
   // ---------------- tuhaf / kotu niyetli ----------------

@@ -138,7 +138,7 @@ export class Salon {
     // gercek fonksiyondaki gibi: iletisim telefonu gecerli bir TR numarasi olmali
     const digits = String(body.contact_phone ?? '').replace(/\D/g, '')
     if (!(digits.length === 10 || digits.length === 11 || (digits.length === 12 && digits.startsWith('90')))) {
-      return { error: 'Geçerli bir telefon numarası gerekli' }
+      return { error: 'Geçerli bir telefon numarası giriniz (ör. 0532 123 45 67)' }
     }
     const service = SERVICES.find((s) => s.name.toLocaleLowerCase('tr') === String(body.service_name ?? '').toLocaleLowerCase('tr'))
     if (!service) return { error: 'Hizmet bulunamadı' }
