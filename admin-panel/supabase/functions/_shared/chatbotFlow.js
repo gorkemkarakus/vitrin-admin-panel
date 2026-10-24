@@ -176,7 +176,7 @@ Kurallar:
 - Müşteri sadece kendi adını veya telefon numarasını düzeltmek isterse (ör. "aslında adım X değil Y", "telefon numaramı yanlış söylemişim"), bunu YUKARIDAKİ İPTAL KURALIYLA KARIŞTIRMA — bu bir iptal/değişiklik talebi DEĞİLDİR. Düzeltmeyi nazikçe kabul et ("Tamam, notumu güncelledim: Y") ve sohbetin geri kalanında düzeltilmiş bilgiyi kullan.
 - Müşteri HENÜZ GERÇEK bir randevusu OLUŞMAMIŞKEN (book_appointment hiç çağrılmadıysa, YA DA çağrıldı ama backend SADECE bir alternatif saat ÖNERDİ ve müşteri bunu henüz onaylamadıysa) "vazgeçtim/iptal edelim/boşver" derse, bunu da YUKARIDAKİ İPTAL KURALIYLA KARIŞTIRMA — ortada iptal edilecek GERÇEK bir randevu yok, bu yüzden müşteriyi işletmeyi aramaya YÖNLENDİRME. Sadece bu talebi bıraktığını kısaca onayla (ör. "Tamam, bu talebi iptal ettim.") ve book_appointment çağırma. AMA müşteri "vazgeçtim" derken AYNI mesajda yeni bir tarih/saat/hizmet bilgisi de veriyorsa (ör. "vazgeçtim, 27 Temmuz Pazartesi olsun"), bu bir İPTAL DEĞİL bir DEĞİŞİKLİK talebidir — eski bilgiyi yok sayıp yeni verilen bilgiyle devam et (eksik bir şey varsa kısaca sor, hepsi tamamsa book_appointment'ı çağır); bu durumda talebi tamamen iptal ettiğini söyleyip durma.
 - Bilgi eksikse (hangi hizmet, hangi gün, hangi saat) fonksiyonu çağırmadan önce kısaca sor.
-- Müşteri "müsait mi / boş mu / yer var mı" diye sorarsa: müsaitliğe sistem ancak randevu denerken bakabilir. Hizmet belli değilse ÖNCE hangi hizmeti istediğini sor; "kontrol edeyim" deyip bekletme.
+- Müşteri "müsait mi / boş mu / yer var mı / en erken ne zaman" diye sorarsa: müsaitliğe sistem ancak randevu denerken bakabilir. Bunu müşteriye teknik olarak ANLATMA ("randevu talebi oluştururken kontrol edebiliyorum" gibi cümle kurma); hizmet belli değilse önce hizmeti, belliyse hangi gün ve saatte gelmek istediğini sor. Hiçbir saati kendiliğinden "boş/müsait" diye söyleme.
 - "yarın", "pazartesi" gibi göreceli ifadeleri bugünün tarihine göre kesin bir tarihe çevir. "Ayın 31'i", "ayın 5'inde" gibi ifadeler İÇİNDE BULUNDUĞUMUZ ayı kasteder (o gün bu ay geçtiyse gelecek ayı); "hangi ayın?" diye SORMA. Müşterinin zaten açıkça verdiği saat, ad ve telefonu ayrıca "doğru mu?" diye tekrar onaylatma.
 - "GELECEK HAFTA [gün]" ifadesi için ASLA KENDİN HESAPLAMA — aşağıdaki hazır tabloya bak ve doğrudan oradan oku (bu sık yanlış hesaplanan bir ifade türüdür, bu yüzden tablo senin için önceden hazırlandı):
   (Tablo en alttaki İŞLETME BİLGİLERİ bölümünde.)
@@ -840,7 +840,11 @@ const mentionedServiceCount = contextServices.filter((svc) => curMsgLower.includ
 // sinif hata) — Turkce harf sinifiyla duzeltildi.
 const svcAlt = contextServices.join('|');
 const twoServicesConjunctionRe = new RegExp('(?:' + svcAlt + ')\\s*(?:ve|ile)\\s*(?:' + svcAlt + ')', 'i');
-const multiServiceSignal = twoServicesConjunctionRe.test(webhookData.message || '');
+// "manikür sonra pedikür" gibi "ve/ile"siz iki hizmet de ikinci randevudur;
+// "manikür hayır pardon pedikür" gibi duzeltme degilse.
+const correctionWordRe = /hayır|pardon|değil|yerine|vazgeç|olmasın/i;
+const multiServiceSignal = twoServicesConjunctionRe.test(webhookData.message || '') ||
+  (mentionedServiceCount >= 2 && !correctionWordRe.test(webhookData.message || ''));
 // "arkadaş" disindaki yakin akrabalik kelimeleri (anne/kardeş/eş/kız/oğul)
 // AYNI sinif ikinci-kisi-rezervasyonu icin kullanildiginda hic yakalanmiyordu
 // (canli testte 4 ayri kelimeyle dogrulandi: "annemin de", "kardeşimin de",
@@ -854,7 +858,9 @@ const multiServiceSignal = twoServicesConjunctionRe.test(webhookData.message || 
 // DEGIL "oğlum" denir, test edilip dogrulandi: "oğlum da gelecek" hic
 // tetiklemedi). "oğ(?:ul|l)" ile hem dusen hem dusmeyen hali kapsiyoruz.
 const secondBookingSignalRe = /(?:arkadaş|anne|baba|kardeş|eş|kız|oğ(?:ul|l))[a-zçğıöşü]*\s+(?:da\b|de\b|telefonu|numarası|numaram[ıi])/i;
-const hasSecondBookingSignal = secondBookingSignalRe.test(webhookData.message || '');
+// "eşimle beraber iki kişi", "annemle", "ikimiz" da ikinci kisi randevusudur
+const twoPeopleRe = /(?<![a-zçğıöşü])(iki|2|üç|3) kişi|ikimiz|(eşim|annem|kızım|oğlum|arkadaşım|kardeşim)(le|la)(?![a-zçğıöşü])/i;
+const hasSecondBookingSignal = secondBookingSignalRe.test(webhookData.message || '') || twoPeopleRe.test(webhookData.message || '');
 const multiBookingNote = multiServiceSignal || (hasSecondBookingSignal && mentionedServiceCount >= 1) ? true : null;
 // Musteri ayni mesaj icinde hizmeti de duzeltebiliyor (ör. "saç ekimi hayır
 // pardon pedikür istiyorum") — ESKI kod hizmet listesini SADECE isim
@@ -886,7 +892,12 @@ for (const svc of contextServices) {
     currentMsgService = svc;
   }
 }
-const finalServiceName = currentMsgService || toolArgs.service_name;
+// Mesajda birden fazla hizmet geciyorsa ve modelin sectigi de onlardan biriyse
+// model kazanir: "yarın 10da manikür sonra 11de pedikür"de saatle hizmeti
+// model eslestiriyor, "en son gecen" kurali 10:00'a pedikür aciyordu (testte).
+const mentionedServices = contextServices.filter((svc) => curMsgLower.includes(svc.toLowerCase()));
+const llmServiceMentioned = mentionedServices.some((svc) => svc.toLowerCase() === String(toolArgs.service_name || '').toLowerCase());
+const finalServiceName = mentionedServices.length > 1 && llmServiceMentioned ? toolArgs.service_name : (currentMsgService || toolArgs.service_name);
 
 // Musteri ayni mesaj icinde kendini duzeltebiliyor (ör. "telefonum 0555111,
 // hayır aslında 0555999") - LLM bu durumda bazen DUZELTILMEMIS (ilk soylenen)
@@ -1071,7 +1082,7 @@ if (weekdayNote) {
   reply = `Bilginize, o gün ${weekdayNote}.\n\n` + reply;
 }
 if ($('Build Booking Request').item.json.recurring_note) {
-  reply = reply + '\n\nNot: Şu an sadece tek seferlik randevu alabiliyoruz — düzenli/tekrarlayan bir randevu için her seferinde ayrı mesaj göndermeniz gerekiyor.';
+  reply = reply + '\n\nBir seferde tek bir randevu alabiliyorum; düzenli randevularınızın her birini ayrıca yazarsanız hemen ayarlayayım.';
 }
 // n7/ig12'nin deterministik olarak tespit ettigi "musteri ayni mesajda 2+
 // hizmet ya da kendisi+baskasi icin ayri randevu istedi" durumunu burada
@@ -1081,8 +1092,10 @@ if ($('Build Booking Request').item.json.recurring_note) {
 // multi_booking_note yorumu — test edilip dogrulandi, bu not olmadan
 // musteriye ikinci istegin sessizce dustugu HICBIR SEKILDE bildirilmiyordu).
 if ($('Build Booking Request').item.json.multi_booking_note) {
-  reply = reply + '\n\nNot: Şu an tek seferde sadece bir randevu alabiliyoruz. Diğer hizmetiniz/kişiniz için ayrı bir mesaj gönderir misiniz?';
+  reply = reply + '\n\nBir seferde bir randevu alabiliyorum; diğer randevunun bilgilerini ayrıca yazarsanız onu da hemen ayarlayayım.';
 }
+// arkasindan not geldiyse konusma suruyor: kartin sonundaki veda kalkar
+reply = reply.replace(/\nGörüşmek üzere!(?=\n)/, '');
 
 return [{ json: { reply, customer_phone: webhookData.from, message: webhookData.message } }];
 }

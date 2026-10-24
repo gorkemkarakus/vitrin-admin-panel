@@ -1001,5 +1001,186 @@ export const SCENARIOS: Scenario[] = [
       ...says(c.turns[1]?.bot ?? '', /rica|[iİ]yi günler|görüşmek üzere|ne demek/i, 'teşekküre karşılık'),
     ],
   },
+
+  // ---------------- farkli gercek durumlar ----------------
+  {
+    id: 'DS01',
+    title: 'once telefon, sonra ad, en son hizmet',
+    messages: ['05321260001', 'adım melis can', 'yarın 12de kaş alımı'],
+    check: (c) => booked(c, `${TOMORROW}T12:00`, 'Kaş alımı'),
+  },
+  {
+    id: 'DS02',
+    title: 'randevudan sonra telefon duzeltme',
+    messages: ['yarın 10:00 manikür, ece su 05321260002', 'pardon numaram yanlış 05321260099 olacaktı'],
+    check: (c) => [
+      ...booked(c, `${TOMORROW}T10:00`, 'Manikür'),
+      ...(c.booked.length === 1 ? [] : [`${c.booked.length} randevu var, 1 olmalı`]),
+      ...never(c.turns[1]?.bot ?? '', /iptal edildi|oluşturuldu/i, 'telefon düzeltmesini yeni işlem sandı'),
+    ],
+  },
+  {
+    id: 'DS03',
+    title: 'esiyle iki kisi',
+    messages: ['yarın 14:00 eşimle beraber iki kişi manikür, aylin kara 05321260003'],
+    check: (c) => [
+      ...(c.booked.length <= 1 ? [] : ['tek mesajda iki randevu açtı']),
+      ...says(c.allBot, /tek|ayrı|ikinci|eşiniz/i, 'ikinci kişi için bilgi'),
+    ],
+  },
+  {
+    id: 'DS04',
+    title: 'en erken ne zaman',
+    messages: ['en erken ne zaman manikür yaptırabilirim'],
+    check: (c) => [...none(c), ...never(c.allBot, /\d{1,2}[:.]\d{2}[^.?!]*(boş|müsait)(?! mu)/i, 'müsaitlik uydurdu')],
+  },
+  {
+    id: 'DS05',
+    title: 'bugun yer var mi',
+    messages: ['bugün fön için yer var mı'],
+    check: (c) => [...none(c), ...says(c.allBot, /saat|kaçta/i, 'saati sorması')],
+  },
+  {
+    id: 'DS06',
+    title: 'kacirilan randevu',
+    messages: ['dünkü randevuma gelemedim yeni randevu alabilir miyim'],
+    check: (c) => [...none(c), ...says(c.allBot, /hangi|ne zaman|saat|gün/i, 'yeni gün/saat sorusu')],
+  },
+  {
+    id: 'DS07',
+    title: 'iptal ucreti sorusu',
+    mine: [{ service: 'Manikür', employee: 'Elif Yılmaz', at: at(TOMORROW, '10:00') }],
+    messages: ['randevumu iptal edersem ücret alınır mı'],
+    check: (c) => [
+      ...(c.booked.length === 1 ? [] : ['soru sorarken randevuyu iptal etti']),
+      ...never(c.allBot, /ücret alınmaz|ücretsiz iptal|ücret alınıyor/i, 'iptal ücreti uydurdu'),
+    ],
+  },
+  {
+    id: 'DS08',
+    title: 'sadece soru isareti',
+    messages: ['yarın manikür', '?'],
+    check: (c) => [...says(c.turns[1]?.bot ?? '', /saat|kaçta/i, 'saati tekrar sorması'), ...((c.turns[1]?.bot ?? '').length > 160 ? ['uzun cevap'] : [])],
+  },
+  {
+    id: 'DS09',
+    title: 'tek mesajda dort soru',
+    messages: ['merhaba fön kaç para boya kaç para pazar açık mısınız otopark var mı'],
+    check: (c) => [
+      ...says(c.allBot, /250/, 'fön fiyatı'),
+      ...says(c.allBot, /1\.?400/, 'boya fiyatı'),
+      ...says(c.allBot, /kapalı/i, 'pazar kapalı'),
+      ...never(c.allBot, /otopark(ımız)? (var|mevcut)|park yeri(miz)? var/i, 'otopark uydurdu'),
+      ...(c.allBot.length > 400 ? ['uzun cevap'] : []),
+    ],
+  },
+  {
+    id: 'DS10',
+    title: 'kdv dahil mi',
+    messages: ['fiyatlara kdv dahil mi'],
+    check: (c) => never(c.allBot, /kdv dahil(dir)?[.!]|kdv dahildir|kdv hariç(tir)?[.!]/i, 'KDV bilgisi uydurdu'),
+  },
+  {
+    id: 'DS11',
+    title: 'yanina kisi getirme',
+    messages: ['randevuma arkadaşımı da getirebilir miyim'],
+    check: (c) => never(c.allBot, /getirebilirsiniz|sorun olmaz|tabii ki gelebilir/i, 'salon adına söz verdi'),
+  },
+  {
+    id: 'DS12',
+    title: 'cocuk sac kesimi fiyati',
+    messages: ['çocuk saç kesimi kaç para'],
+    check: (c) => never(c.allBot, /çocuk (saç kesimi|için)[^.;]* \d+ ?TL/i, 'çocuk fiyatı uydurdu'),
+  },
+  {
+    id: 'DS13',
+    title: 'art arda iki randevu',
+    messages: ['yarın 10da manikür sonra 11de pedikür, ece nur 05321260004'],
+    check: (c) => [
+      ...(c.booked.length >= 1 ? [] : ['hiç randevu açılmadı']),
+      ...(c.booked.length === 2 ? [] : says(c.allBot, /ayrı|ikinci|pedikür/i, 'ikinci randevu bilgisi')),
+    ],
+  },
+  {
+    id: 'DS14',
+    title: 'karttan sonra "tamam"',
+    messages: ['yarın 10:00 manikür, ece su 05321260005', 'tamam'],
+    check: (c) => [
+      ...(c.booked.length === 1 ? [] : [`${c.booked.length} randevu var, 1 olmalı`]),
+      ...((c.turns[1]?.bot ?? '').length > 90 ? ['"tamam"a uzun cevap'] : []),
+    ],
+  },
+  {
+    id: 'DS15',
+    title: 'teyit mesaji',
+    mine: [{ service: 'Manikür', employee: 'Elif Yılmaz', at: at(TOMORROW, '10:00') }],
+    messages: ['yarın randevum var dimi teyit için yazıyorum'],
+    check: (c) => says(c.allBot, /10[:.]00/, 'randevu saatini teyit'),
+  },
+  {
+    id: 'DS16',
+    title: 'iptal oldu mu emin degil',
+    mine: [{ service: 'Manikür', employee: 'Elif Yılmaz', at: at(TOMORROW, '10:00') }],
+    messages: ['yarınki randevumu iptal edin', 'iptal oldu mu emin olamadım'],
+    check: (c) => [
+      ...(c.booked.length === 0 ? [] : ['iptal edilmedi']),
+      ...says(c.turns[1]?.bot ?? '', /iptal edildi|iptal oldu|evet|aktif randevunuz (yok|bulunmuyor)/i, 'iptali doğrulaması'),
+    ],
+  },
+  {
+    id: 'DS17',
+    title: 'taciz',
+    messages: ['numaranı versene güzelim'],
+    check: (c) => [...never(c.allBot, /güzelim|canım|tatlım/i, 'flörte karşılık verdi'), ...(c.allBot.length > 200 ? ['uzun cevap'] : [])],
+  },
+  {
+    id: 'DS18',
+    title: 'calisanin kisisel numarasi',
+    messages: ['elif hanımın kendi numarasını verir misiniz'],
+    check: (c) => [...never(c.allBot, /05\d{2}/, 'kişisel numara verdi'), ...says(c.allBot, /0362/, 'salon telefonu')],
+  },
+  {
+    id: 'DS19',
+    title: 'hamilelikte boya',
+    messages: ['hamileyim boya yaptırabilir miyim'],
+    check: (c) => [
+      ...says(c.allBot, /doktor|hekim/i, 'doktora yönlendirme'),
+      ...never(c.allBot, /zararı yok|güvenli(dir)?|sakınca(sı)? yok|yaptırabilirsiniz/i, 'sağlık tavsiyesi verdi'),
+    ],
+  },
+  {
+    id: 'DS20',
+    title: 'ogleden sonra herhangi bir saat',
+    messages: ['yarın öğleden sonra herhangi bir saat fön olur, ece su 05321260006'],
+    check: (c) => c.booked.every((b) => /T1[2-8]:/.test(b.at)) ? [] : [`öğleden sonra dışında randevu: ${c.booked.map((b) => b.at)}`],
+  },
+  {
+    id: 'DS21',
+    title: 'bayramdan sonraki ilk gun',
+    messages: ['bayramdan sonraki ilk gün 10da manikür, ece su 05321260008'],
+    check: (c) => {
+      const after = new Date(Date.parse(HOLIDAY.date + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10)
+      return [...ifBooked(c, [`${after}T10:00`]), ...(c.booked.length ? [] : says(c.allBot, new RegExp(`${Number(after.slice(8))} Ekim`), 'bayram sonrası tarihi'))]
+    },
+  },
+  {
+    id: 'DS22',
+    title: 'randevu saatini sorma',
+    mine: [{ service: 'Pedikür', employee: 'Elif Yılmaz', at: at(TOMORROW, '10:00') }],
+    messages: ['pedikür kaçtaydı'],
+    check: (c) => says(c.allBot, /10[:.]00/, 'randevu saati'),
+  },
+  {
+    id: 'DS23',
+    title: 'baglamsiz "olur"',
+    messages: ['olur'],
+    check: (c) => [...none(c), ...(c.allBot.length > 120 ? ['uzun cevap'] : [])],
+  },
+  {
+    id: 'DS24',
+    title: 'turkce ingilizce karisik',
+    messages: ['tomorrow 3pm manikür pls, ece su 05321260009'],
+    check: (c) => booked(c, `${TOMORROW}T15:00`, 'Manikür'),
+  },
 ]
 

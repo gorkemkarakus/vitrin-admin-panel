@@ -653,3 +653,44 @@ Deno.test('tesekkurde tam ad sadelesir, hitap kalir', () => {
   assertEquals(fixEchoedTypos('Teşekkürler Zeynep Kaya, telefon numaranızı da yazar mısınız?'), 'Teşekkürler, telefon numaranızı da yazar mısınız?')
   assertEquals(fixEchoedTypos('Teşekkürler Derya Hanım, telefon numaranızı da yazar mısınız?'), 'Teşekkürler Derya Hanım, telefon numaranızı da yazar mısınız?')
 })
+
+Deno.test('iki hizmet iki saat: model saatle eslestirdigi hizmeti korur, ikinci randevu notu eklenir', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, message: '2026-11-03 10da manikür sonra 11de pedikür, ece nur 05321112233' },
+    deps(
+      fakeFetch(
+        {
+          'staff-whatsapp-webhook': { handled: false },
+          'chatbot-context': {
+            ...context,
+            services: [
+              { name: 'Manikür', duration_minutes: 45, price: 450 },
+              { name: 'Pedikür', duration_minutes: 60, price: 500 },
+            ],
+            appointments: [],
+          },
+          openai: openaiTool('book_appointment', {
+            service_name: 'Manikür',
+            date: '2026-11-03',
+            time: '10:00',
+            customer_full_name: 'Ece Nur',
+            customer_contact_phone: '05321112233',
+          }),
+          'book-appointment': {
+            status: 'booked',
+            appointment: { service_name: 'Manikür', scheduled_at: '2026-11-03T07:00:00Z', employee_name: 'Elif Yılmaz' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  assertEquals(calls.find((c) => c.url.endsWith('book-appointment'))!.body.service_name, 'Manikür')
+  assertEquals(
+    r.reply,
+    'Randevunuz oluşturuldu ✅\nManikür - 3 Kasım 10:00 - Elif Yılmaz\n\nBir seferde bir randevu alabiliyorum; diğer randevunun bilgilerini ayrıca yazarsanız onu da hemen ayarlayayım.',
+  )
+})
