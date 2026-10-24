@@ -46,6 +46,10 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+# Sitedeki WhatsApp baglama sayfasi cagirir; kimlik tek kullanimlik oturum kodudur.
+[functions.whatsapp-connect-complete]
+verify_jwt = false
+
 # Gercek Supabase kullanici JWT'si (Authorization header) gerektiren
 # fonksiyonlar — varsayilan zaten budur, tutarlilik icin acikca yazildi.
 [functions.chatbot-context]

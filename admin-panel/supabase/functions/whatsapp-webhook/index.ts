@@ -35,9 +35,20 @@ interface WhatsAppMessage {
   text?: { body: string }
 }
 
+// Coexistence: salonun telefondaki WhatsApp Business uygulamasindan
+// musteriye yazdigi mesajin kopyasi (smb_message_echoes).
+interface WhatsAppEcho {
+  id?: string
+  to?: string
+  to_user_id?: string
+  type?: string
+  text?: { body?: string }
+}
+
 interface WhatsAppValue {
   metadata?: { phone_number_id?: string }
   messages?: WhatsAppMessage[]
+  message_echoes?: WhatsAppEcho[]
   contacts?: { profile?: { name?: string } }[]
   statuses?: {
     id?: string
@@ -193,6 +204,63 @@ async function answerWithChatbot(admin: SupabaseClient, payload: N8nForwardPaylo
 // waitUntil'in yakalanmamis reddi loglanir ama Meta'yi etkilemez, zaten yanit
 // gitti) — ama yine de "beklenen, zararsiz durum" ile "gercek hata" ayrimini
 // loglarda tutmak icin console.log/console.error ayriliyor.
+// Salon musteriye telefondan (WhatsApp Business uygulamasi) yazinca kopyasi
+// gelir: personel konusmayi devraldi, asistan bu musteride ECHO_PAUSE_HOURS
+// boyunca susar (her yeni mesaj sureyi uzatir) ve mesaj sohbet gecmisine
+// eklenir; uygulamada gorunur, asistan sonra baglami bilir.
+// Not: telefondaki uygulamanin otomatik karsilama/uzakta mesajlari da bu
+// yoldan gelir ve asistani susturur; salon bunlari kapatmali.
+const ECHO_PAUSE_HOURS = 3
+
+async function handleEchoes(admin: SupabaseClient, req: Request, value: WhatsAppValue): Promise<void> {
+  const phoneNumberId = value.metadata?.phone_number_id ?? null
+  const business = await resolveBusiness(admin, req, phoneNumberId, { trusted: true })
+  if (!business) {
+    console.log('whatsapp-webhook: echo için işletme bulunamadı, phone_number_id:', phoneNumberId)
+    return
+  }
+
+  for (const echo of value.message_echoes ?? []) {
+    const customerPhone = echo.to ?? echo.to_user_id ?? ''
+    if (!echo.id || !customerPhone) continue
+
+    const { error: dupErr } = await admin.from('whatsapp_processed_messages').insert({ wamid: echo.id })
+    if (dupErr) {
+      if (dupErr.code !== '23505') console.error('whatsapp-webhook: echo kaydı başarısız:', dupErr.message)
+      continue
+    }
+
+    const until = new Date(Date.now() + ECHO_PAUSE_HOURS * 3600000).toISOString()
+    const { data: customer } = await admin
+      .from('customers')
+      .select('id, bot_paused_until')
+      .eq('business_id', business.id)
+      .eq('phone', customerPhone)
+      .maybeSingle()
+    if (customer) {
+      if (!customer.bot_paused_until || customer.bot_paused_until < until) {
+        await admin.from('customers').update({ bot_paused_until: until }).eq('id', customer.id)
+      }
+    } else {
+      const { error: insErr } = await admin
+        .from('customers')
+        .insert({ business_id: business.id, phone: customerPhone, full_name: 'Müşteri', bot_paused_until: until })
+      if (insErr) console.error('whatsapp-webhook: echo müşterisi oluşturulamadı:', insErr.message)
+    }
+
+    if (echo.type === 'text' && echo.text?.body) {
+      const { error: logErr } = await admin.from('chatbot_messages').insert({
+        business_id: business.id,
+        customer_phone: customerPhone,
+        role: 'assistant',
+        content: echo.text.body,
+      })
+      if (logErr) console.error('whatsapp-webhook: echo mesajı kaydedilemedi:', logErr.message)
+    }
+    console.log('whatsapp-webhook: salon telefondan yazdı, asistan susturuldu', { business_id: business.id, wamid: echo.id })
+  }
+}
+
 async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody: string): Promise<void> {
   let payload: WhatsAppPayload
   try {
@@ -217,6 +285,11 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
     } else {
       console.log('whatsapp-webhook: teslim durumu', { message_id: s.id, status: s.status })
     }
+  }
+
+  if (value?.message_echoes?.length) {
+    await handleEchoes(admin, req, value)
+    return
   }
 
   // messages dizisi bos olabilir (durum guncellemesi — delivered/read/sent

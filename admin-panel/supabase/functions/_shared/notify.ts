@@ -1,4 +1,5 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { whatsappAccessToken } from './whatsappToken.ts'
 
 // Coklu-isletme oldugu icin sabit tek numara YOK — hangi isletmenin
 // numarasindan gonderilecegini cagiran belirler (businesses.whatsapp_phone_number_id).
@@ -38,8 +39,9 @@ export async function sendWhatsAppText(params: {
   to: string
   message: string
 }): Promise<{ ok: boolean; error?: string; messageId?: string }> {
-  const token = Deno.env.get('WHATSAPP_TOKEN')
-  if (!token) return { ok: false, error: 'WHATSAPP_TOKEN yapılandırılmamış' }
+  // salonun kendi numarasiysa onun anahtari, degilse (test numarasi) WHATSAPP_TOKEN
+  const token = await whatsappAccessToken(params.phoneNumberId)
+  if (!token) return { ok: false, error: 'WhatsApp erişim anahtarı yok' }
 
   try {
     const res = await fetch(`https://graph.facebook.com/v25.0/${params.phoneNumberId}/messages`, {
@@ -76,7 +78,7 @@ export async function sendWhatsAppText(params: {
 // "yaziyor..." gosterir (Meta en fazla 25 sn gosterir, cevap gelince kalkar).
 // Basarisiz olursa sessizce gecilir; cevap yine gider.
 export async function sendTypingIndicator(params: { phoneNumberId: string; messageId: string }): Promise<void> {
-  const token = Deno.env.get('WHATSAPP_TOKEN')
+  const token = await whatsappAccessToken(params.phoneNumberId)
   if (!token) return
   try {
     await fetch(`https://graph.facebook.com/v25.0/${params.phoneNumberId}/messages`, {
