@@ -39,6 +39,7 @@ const nextWeek = (dow: number) => {
   const nextMonday = new Date(Date.UTC(istToday.getUTCFullYear(), istToday.getUTCMonth(), istToday.getUTCDate() - isoDay + 7))
   return ymd(new Date(nextMonday.getTime() + ((dow + 6) % 7) * 86400000))
 }
+const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 const TOMORROW = plus(1)
 const MONDAY = nextDow(1)
 const SUNDAY = nextDow(0)
@@ -704,6 +705,30 @@ export const SCENARIOS: Scenario[] = [
       new Date(Date.now() + 3 * 3600000).getUTCHours() < 17 ? booked(c, `${plus(0)}T18:00`, 'Fön') : ifBooked(c, []),
   },
   { id: 'Z06', title: 'dun icin', messages: ['dün için randevu alabilir miyim'], check: (c) => none(c) },
+  // telefondan gelen gercek ornek: yazim hatasi aynen tekrarlaniyordu, salon adi tirnakli
+  {
+    id: 'Z07',
+    title: '"hafaya" yazim hatasi',
+    messages: ['Selam dostum randevu istiyorum hafaya Çarşamba manikür'],
+    check: (c) => [
+      ...none(c),
+      ...never(c.allBot, /hafaya/i, 'yazım hatasını tekrarladı'),
+      ...says(c.allBot, new RegExp(`${Number(nextWeek(3).slice(8))} ${MONTHS[Number(nextWeek(3).slice(5, 7)) - 1]}`), 'haftaya çarşambanın kesin tarihi'),
+      ...says(c.allBot, /saat|kaçta/i, 'saati sorması'),
+    ],
+  },
+  {
+    id: 'Z08',
+    title: '"hafaya" ile tam bilgi',
+    messages: ['hafaya cuma 14:00 manikür, eda nur 05321240013'],
+    check: (c) => booked(c, `${nextWeek(5)}T14:00`, 'Manikür'),
+  },
+  {
+    id: 'Z09',
+    title: 'selamlasma, salon adi',
+    messages: ['merhabalar'],
+    check: (c) => never(c.allBot, /onaylarsanız/i, 'vaat cümlesi'),
+  },
 
 
   // ---------------- cok uzun konusmalar ----------------

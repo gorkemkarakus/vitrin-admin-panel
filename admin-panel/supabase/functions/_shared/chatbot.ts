@@ -132,7 +132,7 @@ export function askForSurname(parsed: Json, message: string, context: Json): str
 export function misreadCustomerName(parsed: Json, message: string): string | null {
   if (parsed.hasToolCall === true) return null
   const reply = String(parsed.chatReply ?? '')
-  const m = reply.match(/["“]?([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)?)["”]?\s+(?:salonumuzda|bizde|burada|işletmemizde)\s+çalışmıyor/)
+  const m = reply.match(/["“]?([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)?)["”]?\s+(?:salonumuzda|bizde|burada|işletmemizde)\s+(?:çalışmıyor|kayıtlı değil)/)
   if (!m) return null
   const name = m[1].toLocaleLowerCase('tr')
   const text = message.toLocaleLowerCase('tr')
@@ -145,8 +145,16 @@ export function misreadCustomerName(parsed: Json, message: string): string | nul
 
 const MONTHS = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık']
 
+// Model musterinin yazim hatasini bazen aynen geri yaziyor ("hafaya Çarşamba
+// ... istediniz"); talimata ragmen kalan sik hatalar gondermeden once duzeltilir.
+const ECHOED_TYPOS: [RegExp, string][] = [[/\b(h)(?:afaya|aftya)(?![a-zçğıöşü])/gi, '$1aftaya']]
+export function fixEchoedTypos(reply: string): string {
+  return ECHOED_TYPOS.reduce((s, [re, to]) => s.replace(re, to), reply)
+}
+
 // Saat degisikligi onerisi ("İstediğiniz yeni saat için uygun değiliz. En yakın
-// uygun saat: 24 Ekim 15:00 - Elif. Uygun mu?") onaylandiysa ve musterinin
+// uygun saat: 24 Ekim 15:00 - Elif. Uygun mu?"; tatil gunu icin "O gün (X)
+// kapalıyız. Randevunuzu taşımak için en yakın uygun saat: ...") onaylandiysa ve musterinin
 // tek aktif randevusu varsa, modele sormadan o randevu onerilen saate tasinir.
 // Model bu onayi yeni randevu sanip ad/telefon istiyordu (testte 3'te 2).
 export function confirmedReschedule(message: string, context: Json): { appointment_id: string; date: string; time: string } | null {
@@ -154,7 +162,7 @@ export function confirmedReschedule(message: string, context: Json): { appointme
   const history = Array.isArray(context.history) ? (context.history as { role?: string; content?: unknown }[]) : []
   const last = [...history].reverse().find((h) => h.role === 'assistant')
   const m = String(last?.content ?? '').match(
-    /İstediğiniz yeni saat için uygun değiliz\. En yakın uygun saat:\s*(\d{1,2})\s+([A-Za-zÇĞİÖŞÜçğıöşü]+)(?:\s+(\d{4}))?\s+(\d{2}:\d{2})/,
+    /(?:İstediğiniz yeni saat için uygun değiliz\. En yakın uygun saat|Randevunuzu taşımak için en yakın uygun saat):\s*(\d{1,2})\s+([A-Za-zÇĞİÖŞÜçğıöşü]+)(?:\s+(\d{4}))?\s+(\d{2}:\d{2})/,
   )
   const appointments = Array.isArray(context.appointments) ? (context.appointments as { id?: string }[]) : []
   if (!m || appointments.length !== 1 || !appointments[0].id) return null
@@ -314,7 +322,7 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
   // Uzun tire (—) WhatsApp'ta insan yazisi gibi durmuyor ("yapay zeka yazmis"
   // hissi); talimata ragmen kalanlar virgule cevrilir. Kayda da temiz hali gider.
   const rawReply = typeof replyStep.reply === 'string' ? replyStep.reply : ''
-  const reply = rawReply.replace(/\s*[—–]\s*/g, ', ').replace(/,\s*([.?!])/g, '$1')
+  const reply = fixEchoedTypos(rawReply.replace(/\s*[—–]\s*/g, ', ').replace(/,\s*([.?!])/g, '$1'))
   replyStep.reply = reply
   const log = fn(
     'chatbot-log-message',

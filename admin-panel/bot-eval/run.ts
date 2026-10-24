@@ -4,7 +4,8 @@
 // Calistir (admin-panel klasorunden):
 //   deno run --allow-net=api.openai.com --allow-read --allow-write --allow-env bot-eval/run.ts [filtre]
 // OpenAI anahtari: OPENAI_API_KEY ortam degiskeni ya da ~/.adapptiv/openai-key dosyasi.
-// Senaryolar hafta ici (Pzt-Cuma) calistirilmak uzere yazildi ("yarın" acik gun).
+// Senaryolar hafta ici (Pzt-Cuma) icin yazildi; hafta sonu clock.ts saati kaydirir.
+import './clock.ts'
 import { runChatbot } from '../supabase/functions/_shared/chatbot.ts'
 import { EMPLOYEES, HOLIDAY, Salon, SALON_PHONE, SERVICES, WORKING_HOURS, istLocal } from './salon.ts'
 import { SCENARIOS, type Turn } from './scenarios.ts'
@@ -133,6 +134,8 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
   if (modelReplies.some((b) => b.includes('—'))) failures.push('uslup: uzun tire (—)')
   if (modelReplies.some((b) => /\b20\d\d\b|\d{1,2}\.\d{1,2}\.\d{4}/.test(b))) failures.push('uslup: tarihte yil')
   if (/Sen Güzel Salon/.test(all)) failures.push('salon adini "Sen Güzel Salon" yazdi')
+  if (/["“”']Güzel Salon["“”']/.test(all)) failures.push('salon adini tirnakla yazdi')
+  if (/onaylarsanız randevu/i.test(all)) failures.push('uslup: "onaylarsanız randevunuzu alayım" vaadi')
   if (modelReplies.some((b) => b.length > 500)) failures.push('uslup: 500+ karakterlik cevap')
   if (/\bid:|randevu-\d/i.test(all)) failures.push('musteriye ic kimlik (id) yazdi')
   return { id: sc.id, title: sc.title, turns, failures, ms }

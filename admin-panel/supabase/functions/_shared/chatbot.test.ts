@@ -2,7 +2,7 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { askForSurname, earlyHourQuestionText, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
+import { askForSurname, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
 import { isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
 
@@ -102,7 +102,7 @@ Deno.test('sohbet: OpenAI cevabi gider, mesaj ve cevap kaydedilir', async () => 
   // sabit kurallar once (onbellek), salona ozel bilgiler ikinci mesajda
   assert(msgs[0].content.startsWith('Sen bir işletmenin WhatsApp/Instagram asistanısın.'))
   assert(!msgs[0].content.includes('Güzel Salon'))
-  assert(msgs[1].content.startsWith('İŞLETME BİLGİLERİ\nİşletme: "Güzel Salon"'))
+  assert(msgs[1].content.startsWith('İŞLETME BİLGİLERİ\nİşletmenin adı: Güzel Salon\n'))
   assertEquals(msgs.at(-1), { role: 'user', content: 'Fön kaç para?' })
   const log = calls.find((c) => c.url.endsWith('chatbot-log-message'))!
   assertEquals(log.body, {
@@ -517,6 +517,7 @@ Deno.test('ad karisikligi yakalanir: musterinin adi "calismiyor" denirse', () =>
   assertEquals(misreadCustomerName(chat('Hande Özkan salonumuzda çalışmıyor maalesef.'), 'haftaya salı 10:00 manikür, hande özkan 0532'), 'Hande Özkan')
   assertEquals(misreadCustomerName(chat('Ahmet bizde çalışmıyor.'), 'ahmet beyle yarın 10 saç kesimi, can er 0532'), null)
   assertEquals(misreadCustomerName(chat('Elif Demir salonumuzda çalışmıyor.'), 'pazartesi 13.30 fön Elif Demir 05321234567'), 'Elif Demir')
+  assertEquals(misreadCustomerName(chat('Elif Demir salonumuzda kayıtlı değil; fönü Büşra Aydın yapabiliyor.'), 'pazartesi 13.30 fön Elif Demir 05321234567'), 'Elif Demir')
   assertEquals(misreadCustomerName(chat('Merve Ak salonumuzda çalışmıyor'), 'yarın fön'), null)
 })
 
@@ -567,4 +568,10 @@ Deno.test('guvenlik agi: model randevu acmadan "oluşturuldu" derse gonderilmez;
   assert(!(await run('Randevunuz oluşturuldu, görüşmek üzere.', noAppts)).includes('oluşturuldu, görüşmek'))
   assertEquals(await run('Manikür 450 TL. İsterseniz randevunuzu oluşturuyorum, uygun mu?', noAppts), 'Manikür 450 TL. İsterseniz randevunuzu oluşturuyorum, uygun mu?')
   assertEquals(await run('Randevunuz 23 Ekim için oluşturuldu.'), 'Randevunuz 23 Ekim için oluşturuldu.')
+})
+
+Deno.test('yazim hatasi tekrari: "hafaya" cevapta "haftaya" olur', () => {
+  assertEquals(fixEchoedTypos('Hafaya Çarşamba, yani 28 Ekim için manikür.'), 'Haftaya Çarşamba, yani 28 Ekim için manikür.')
+  assertEquals(fixEchoedTypos('hafaya cuma ve haftya salı'), 'haftaya cuma ve haftaya salı')
+  assertEquals(fixEchoedTypos('Haftaya görüşürüz, şafaya değil'), 'Haftaya görüşürüz, şafaya değil')
 })
