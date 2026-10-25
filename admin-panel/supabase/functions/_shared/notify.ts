@@ -136,7 +136,12 @@ export async function sendCustomerMessage(
   // 24 saattir yazmadiysa Meta serbest-metin penceresi kapali oldugu icin
   // hata donecek — bu HER 15 dakikada bir tekrar denenip Meta'ya sonsuza
   // kadar basarisiz istek atilmasina yol acmamali.
-  const result = await sendWhatsAppText({ phoneNumberId: params.phoneNumberId, to: toWhatsAppPhone(params.phone), message: params.message })
+  // Konusma kaydi da gonderilen bicimle (90...) yazilir: bot konusmalari
+  // Meta'nin 'from' degeriyle (90...) kaydediliyor, Mesajlar ekrani da
+  // konusmalari bu degere gore grupluyor. Musteri kartindaki "0532..."
+  // yazilirsa ayni kisi ikinci bir sohbet gibi gorunur.
+  const to = toWhatsAppPhone(params.phone)
+  const result = await sendWhatsAppText({ phoneNumberId: params.phoneNumberId, to, message: params.message })
   if (!result.ok) {
     console.error('sendCustomerMessage: WhatsApp gönderimi başarısız:', result.error)
     return { ok: true }
@@ -145,7 +150,7 @@ export async function sendCustomerMessage(
 
   const { error: chatLogError } = await admin.from('chatbot_messages').insert({
     business_id: params.businessId,
-    customer_phone: params.phone,
+    customer_phone: to,
     role: 'assistant',
     content: params.message,
   })
