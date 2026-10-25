@@ -58,6 +58,10 @@ verify_jwt = true
 [functions.chatbot-log-message]
 verify_jwt = true
 
+# Mesajlar ekranindan salonun musteriye WhatsApp'tan yazmasi.
+[functions.send-chat-message]
+verify_jwt = true
+
 [functions.parse-appointment-command]
 verify_jwt = true
 

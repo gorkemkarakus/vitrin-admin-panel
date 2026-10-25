@@ -9,7 +9,7 @@ import type { LayoutOutletContext } from '../layouts/DashboardLayout'
 import styles from './MessagesPage.module.css'
 
 interface RawMessage {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'staff'
   content: string
   customer_phone: string
   created_at: string

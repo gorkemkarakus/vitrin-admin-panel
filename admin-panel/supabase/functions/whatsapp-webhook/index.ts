@@ -252,7 +252,7 @@ async function handleEchoes(admin: SupabaseClient, req: Request, value: WhatsApp
       const { error: logErr } = await admin.from('chatbot_messages').insert({
         business_id: business.id,
         customer_phone: customerPhone,
-        role: 'assistant',
+        role: 'staff',
         content: echo.text.body,
       })
       if (logErr) console.error('whatsapp-webhook: echo mesajı kaydedilemedi:', logErr.message)

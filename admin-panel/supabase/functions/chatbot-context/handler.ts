@@ -42,7 +42,7 @@ export async function handler(req: Request): Promise<Response> {
   const { customer_phone } = body
   if (!customer_phone) return json({ error: 'customer_phone zorunlu' }, 400)
 
-  const [{ data: services }, { data: customer }, { data: history }, { data: profiles }] = await Promise.all([
+  const [{ data: services }, { data: customer }, { data: historyRows }, { data: profiles }] = await Promise.all([
     admin
       .from('services')
       .select('id, name, price, duration_minutes, description')
@@ -64,6 +64,10 @@ export async function handler(req: Request): Promise<Response> {
       .limit(HISTORY_LIMIT),
     admin.from('profiles').select('id, full_name, gender').eq('business_id', business.id).eq('is_active', true),
   ])
+  // Salonun kendisinin yazdigi mesajlar ('staff': uygulamadan ya da
+  // telefondaki WhatsApp Business'tan) bot icin isletmenin cevabidir; dil
+  // modeli yalnizca user/assistant tanir.
+  const history = (historyRows ?? []).map((h) => (h.role === 'staff' ? { ...h, role: 'assistant' } : h))
 
   const serviceNameById = new Map((services ?? []).map((s) => [s.id, s.name]))
   const profileIds = (profiles ?? []).map((p) => p.id)
