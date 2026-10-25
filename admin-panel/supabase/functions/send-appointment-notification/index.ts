@@ -35,10 +35,14 @@ Deno.serve(async (req) => {
 
   const { data: appt } = await admin
     .from('appointments')
-    .select('id, business_id, customer_id, service_id, scheduled_at')
+    .select('id, business_id, customer_id, service_id, scheduled_at, source')
     .eq('id', appointment_id)
     .maybeSingle()
   if (!appt) return json({ error: 'Randevu bulunamadı' }, 404)
+
+  // Bot randevuyu sohbetin icinde zaten onayliyor (✅ karti); ustune ayni
+  // sohbete ikinci bir onay mesaji gitmesin.
+  if (appt.source === 'chatbot') return json({ ok: true, skipped: 'chatbot' }, 200)
 
   const [{ data: customer }, { data: service }, { data: business }] = await Promise.all([
     appt.customer_id
