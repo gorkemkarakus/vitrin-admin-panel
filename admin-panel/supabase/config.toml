@@ -62,6 +62,10 @@ verify_jwt = true
 [functions.send-chat-message]
 verify_jwt = true
 
+# WhatsApp hesabi ekrani: sablon durumlari / kurulum (yonetici).
+[functions.whatsapp-templates]
+verify_jwt = true
+
 [functions.parse-appointment-command]
 verify_jwt = true
 

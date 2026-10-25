@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendCustomerMessage } from '../_shared/notify.ts'
+import { appointmentParams, renderTemplate } from '../_shared/waTemplates.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
 
 // pg_cron tarafindan her 15 dakikada bir cagirilir (bkz.
@@ -57,12 +58,14 @@ Deno.serve(async (req) => {
     ])
 
     const phone = customer?.contact_phone || customer?.phone || null
-    const d = new Date(appt.scheduled_at)
-    const dateLabel = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', timeZone: 'Europe/Istanbul' })
-    const timeLabel = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' })
-    const customerFirstName = (customer?.full_name ?? '').trim().split(/\s+/)[0] || 'Merhaba'
-
-    const text = `Merhaba ${customerFirstName}, hatırlatma: ${business?.name ?? 'işletmemiz'}'deki randevunuz ${dateLabel} ${timeLabel} — ${service?.name ?? 'Hizmet'}.`
+    // Metin hatirlatma sablonuyla ayni; musteri son 24 saatte yazmadiysa
+    // (hatirlatmalarda cogunlukla) sablon gider.
+    const templateParams = appointmentParams({
+      customerName: customer?.full_name,
+      businessName: business?.name,
+      serviceName: service?.name,
+      scheduledAt: appt.scheduled_at,
+    })
 
     const result = await sendCustomerMessage(admin, {
       businessId: appt.business_id,
@@ -70,7 +73,8 @@ Deno.serve(async (req) => {
       phone,
       phoneNumberId: business?.whatsapp_phone_number_id ?? null,
       kind: 'reminder',
-      message: text,
+      message: renderTemplate('reminder', templateParams),
+      template: { key: 'reminder', params: templateParams },
     })
     if (result.ok) {
       await admin.from('appointments').update({ reminder_sent_at: new Date().toISOString() }).eq('id', appt.id)

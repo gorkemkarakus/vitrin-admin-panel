@@ -1,5 +1,8 @@
-// Salon numarasini baglama (Embedded Signup) sirasinda kullanilan Meta Graph
-// cagrilari. Erisim anahtari asla loglanmaz; hata metni Meta'nin mesajidir.
+import { TEMPLATE_LANG, TEMPLATES, type TemplateKey } from './waTemplates.ts'
+
+// Salon numarasini baglama (Embedded Signup) ve hesabin mesaj sablonlari icin
+// kullanilan Meta Graph cagrilari. Erisim anahtari asla loglanmaz; hata
+// metni Meta'nin mesajidir.
 const GRAPH = 'https://graph.facebook.com/v26.0'
 
 type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -62,4 +65,59 @@ export function subscribeApp(wabaId: string, token: string): Promise<GraphResult
 
 export function unsubscribeApp(wabaId: string, token: string): Promise<GraphResult<unknown>> {
   return graph(`/${wabaId}/subscribed_apps`, { method: 'DELETE', token })
+}
+
+export interface TemplateStatus {
+  key: TemplateKey
+  name: string
+  // APPROVED, PENDING, REJECTED, PAUSED, DISABLED; hesapta yoksa MISSING
+  status: string
+  category: string | null
+}
+
+// Adapptiv sablonlarinin bu hesaptaki durumu.
+export async function templateStatuses(wabaId: string, token: string): Promise<GraphResult<TemplateStatus[]>> {
+  const res = await graph<{ data?: { name: string; status: string; category?: string; language?: string }[] }>(
+    `/${wabaId}/message_templates?fields=name,status,category,language&limit=200`,
+    { token },
+  )
+  if (!res.ok) return res
+  const rows = res.data.data ?? []
+  return {
+    ok: true,
+    data: (Object.keys(TEMPLATES) as TemplateKey[]).map((key) => {
+      const row = rows.find((r) => r.name === TEMPLATES[key].name && (r.language ?? TEMPLATE_LANG) === TEMPLATE_LANG)
+      return { key, name: TEMPLATES[key].name, status: row?.status ?? 'MISSING', category: row?.category ?? null }
+    }),
+  }
+}
+
+// Eksik sablonlari olusturur (Meta inceler, genelde dakikalar icinde onaylar).
+// Var olana dokunmaz; reddedilen sablon ayni adla yeniden gonderilemez,
+// durumu oldugu gibi doner.
+export async function ensureTemplates(wabaId: string, token: string): Promise<GraphResult<TemplateStatus[]>> {
+  const current = await templateStatuses(wabaId, token)
+  if (!current.ok) return current
+  for (const t of current.data) {
+    if (t.status !== 'MISSING') continue
+    const def = TEMPLATES[t.key]
+    const created = await graph<{ id: string; status?: string; category?: string }>(`/${wabaId}/message_templates`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        name: def.name,
+        language: TEMPLATE_LANG,
+        category: 'UTILITY',
+        components: [{ type: 'BODY', text: def.body, example: { body_text: [def.example] } }],
+      }),
+    })
+    if (created.ok) {
+      t.status = created.data.status ?? 'PENDING'
+      t.category = created.data.category ?? 'UTILITY'
+    } else {
+      console.error('ensureTemplates: şablon oluşturulamadı', def.name, created.error)
+      t.status = 'ERROR'
+    }
+  }
+  return current
 }

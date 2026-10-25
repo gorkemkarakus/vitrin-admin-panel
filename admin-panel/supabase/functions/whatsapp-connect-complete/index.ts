@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { encryptToken, sha256Hex } from '../_shared/crypto.ts'
-import { exchangeCode, getPhoneInfo, registerPhone, subscribeApp } from '../_shared/metaWhatsApp.ts'
+import { ensureTemplates, exchangeCode, getPhoneInfo, registerPhone, subscribeApp } from '../_shared/metaWhatsApp.ts'
 import { forgetWhatsappAccessToken } from '../_shared/whatsappToken.ts'
 
 // Sitedeki baglama sayfasi Meta penceresi bitince buraya gelir:
@@ -113,6 +113,12 @@ Deno.serve(async (req) => {
     return json({ error: 'Bağlantı kaydedilemedi, lütfen yeniden deneyin' }, 500)
   }
   forgetWhatsappAccessToken(phoneNumberId)
+
+  // Randevu onay/hatirlatma sablonlari salonun hesabinda kurulur (Meta
+  // inceler). Basarisiz olursa baglanti bozulmaz; WhatsApp hesabi ekranindan
+  // yeniden kurulabilir.
+  const templates = await ensureTemplates(wabaId, token)
+  if (!templates.ok) console.error('whatsapp-connect-complete: şablonlar kurulamadı', templates.error)
 
   console.log('whatsapp-connect-complete: bağlandı', { business_id: sess.business_id, phone_number_id: phoneNumberId, coexistence })
   return json(

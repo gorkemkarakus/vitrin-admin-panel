@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendCustomerMessage } from '../_shared/notify.ts'
+import { appointmentParams, renderTemplate } from '../_shared/waTemplates.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
 
 // Randevu HANGI yoldan olusursa olsun (chatbot, herkese acik randevu sayfasi,
@@ -54,12 +55,13 @@ Deno.serve(async (req) => {
 
   const phone = customer?.contact_phone || customer?.phone || null
 
-  const d = new Date(appt.scheduled_at)
-  const dateLabel = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', timeZone: 'Europe/Istanbul' })
-  const timeLabel = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' })
-  const customerFirstName = (customer?.full_name ?? '').trim().split(/\s+/)[0] || 'Merhaba'
-
-  const text = `Merhaba ${customerFirstName}, ${business?.name ?? 'işletmemiz'} randevunuz oluşturuldu: ${service?.name ?? 'Hizmet'}, ${dateLabel} ${timeLabel}. Görüşmek üzere!`
+  // Metin onay sablonuyla ayni; musteri son 24 saatte yazmadiysa sablon gider.
+  const templateParams = appointmentParams({
+    customerName: customer?.full_name,
+    businessName: business?.name,
+    serviceName: service?.name,
+    scheduledAt: appt.scheduled_at,
+  })
 
   const result = await sendCustomerMessage(admin, {
     businessId: appt.business_id,
@@ -67,7 +69,8 @@ Deno.serve(async (req) => {
     phone,
     phoneNumberId: business?.whatsapp_phone_number_id ?? null,
     kind: 'confirmation',
-    message: text,
+    message: renderTemplate('confirmation', templateParams),
+    template: { key: 'confirmation', params: templateParams },
   })
   return json({ ok: result.ok, error: result.error }, 200)
 })

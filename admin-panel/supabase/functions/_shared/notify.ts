@@ -1,5 +1,6 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { whatsappAccessToken } from './whatsappToken.ts'
+import { TEMPLATE_LANG, TEMPLATES, type TemplateKey } from './waTemplates.ts'
 
 // Coklu-isletme oldugu icin sabit tek numara YOK — hangi isletmenin
 // numarasindan gonderilecegini cagiran belirler (businesses.whatsapp_phone_number_id).
@@ -74,6 +75,59 @@ export async function sendWhatsAppText(params: {
   }
 }
 
+// Onayli sablonla gonderim (musteri son 24 saatte yazmadiysa tek yol).
+// Sablon henuz onaylanmadiysa ya da hesapta yoksa Meta hata doner.
+export async function sendWhatsAppTemplate(params: {
+  phoneNumberId: string
+  to: string
+  name: string
+  params: string[]
+}): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  const token = await whatsappAccessToken(params.phoneNumberId)
+  if (!token) return { ok: false, error: 'WhatsApp erişim anahtarı yok' }
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v25.0/${params.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        ...(isBusinessScopedUserId(params.to) ? { recipient: params.to } : { to: params.to }),
+        type: 'template',
+        template: {
+          name: params.name,
+          language: { code: TEMPLATE_LANG },
+          components: [{ type: 'body', parameters: params.params.map((text) => ({ type: 'text', text })) }],
+        },
+      }),
+    })
+    const resBody = await res.json().catch(() => null)
+    if (!res.ok) return { ok: false, error: JSON.stringify(resBody) }
+    return { ok: true, messageId: resBody?.messages?.[0]?.id ?? null }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+// WhatsApp'in 24 saatlik musteri hizmeti penceresi: musteri bu isletmeye son
+// 24 saatte yazdiysa duz metin gonderilebilir.
+async function customerWroteRecently(admin: SupabaseClient, businessId: string, customerPhone: string): Promise<boolean> {
+  const { data } = await admin
+    .from('chatbot_messages')
+    .select('created_at')
+    .eq('business_id', businessId)
+    .eq('customer_phone', customerPhone)
+    .eq('role', 'user')
+    .gte('created_at', new Date(Date.now() - 24 * 3600000).toISOString())
+    .limit(1)
+    .maybeSingle()
+  return !!data
+}
+
 // Musterinin mesajini "okundu" yapar ve asistan cevabi hazirlarken WhatsApp'ta
 // "yaziyor..." gosterir (Meta en fazla 25 sn gosterir, cevap gelince kalkar).
 // Basarisiz olursa sessizce gecilir; cevap yine gider.
@@ -111,6 +165,9 @@ export async function sendCustomerMessage(
     phoneNumberId: string | null
     kind: 'confirmation' | 'reminder' | 'bulk_campaign'
     message: string
+    // Musteri son 24 saatte yazmadiysa bu onayli sablonla gider (message
+    // sablonun doldurulmus hali olmali; pencere aciksa duz metin gider).
+    template?: { key: TemplateKey; params: string[] }
   },
 ): Promise<{ ok: boolean; error?: string }> {
   if (!params.phone) {
@@ -140,13 +197,23 @@ export async function sendCustomerMessage(
   // Meta'nin 'from' degeriyle (90...) kaydediliyor, Mesajlar ekrani da
   // konusmalari bu degere gore grupluyor. Musteri kartindaki "0532..."
   // yazilirsa ayni kisi ikinci bir sohbet gibi gorunur.
-  const to = toWhatsAppPhone(params.phone)
-  const result = await sendWhatsAppText({ phoneNumberId: params.phoneNumberId, to, message: params.message })
+  const to = isBusinessScopedUserId(params.phone) ? params.phone : toWhatsAppPhone(params.phone)
+  // Musteri son 24 saatte yazdiysa duz metin (ucretsiz, sablon onayi
+  // beklemez); yazmadiysa WhatsApp yalnizca onayli sablona izin verir.
+  const useTemplate = !!params.template && !(await customerWroteRecently(admin, params.businessId, to))
+  const result = useTemplate
+    ? await sendWhatsAppTemplate({
+        phoneNumberId: params.phoneNumberId,
+        to,
+        name: TEMPLATES[params.template!.key].name,
+        params: params.template!.params,
+      })
+    : await sendWhatsAppText({ phoneNumberId: params.phoneNumberId, to, message: params.message })
   if (!result.ok) {
-    console.error('sendCustomerMessage: WhatsApp gönderimi başarısız:', result.error)
+    console.error(`sendCustomerMessage: WhatsApp ${useTemplate ? 'şablon' : 'metin'} gönderimi başarısız:`, result.error)
     return { ok: true }
   }
-  console.log('sendCustomerMessage: WhatsApp gönderimi başarılı, message id:', result.messageId)
+  console.log('sendCustomerMessage: WhatsApp gönderimi başarılı', { messageId: result.messageId, template: useTemplate })
 
   const { error: chatLogError } = await admin.from('chatbot_messages').insert({
     business_id: params.businessId,
