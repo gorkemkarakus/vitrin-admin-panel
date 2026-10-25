@@ -25,10 +25,19 @@ Deno.serve(async (req) => {
 
   // Kimlik ve yetki cagiranin kendi oturumuyla: yonetici her zaman,
   // calisan "mesajlar" izni verildiyse.
+  const body = await req.json().catch(() => null)
+  const phone = typeof body?.customer_phone === 'string' ? body.customer_phone.trim() : ''
+  const message = typeof body?.message === 'string' ? body.message.trim() : ''
+  if (!phone || !message) return json({ error: 'Mesaj boş olamaz' }, 400)
+  if (message.length > MAX_LEN) return json({ error: `Mesaj en fazla ${MAX_LEN} karakter olabilir` }, 400)
+
+  // Birbirini beklemeyen sorgular ayni anda: oturum + yetki, sonra isletme + son musteri mesaji.
   const caller = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
-  const { data: userData, error: userErr } = await caller.auth.getUser()
+  const [{ data: userData, error: userErr }, { data: allowed }] = await Promise.all([
+    caller.auth.getUser(),
+    caller.rpc('has_perm', { p_perm: 'mesajlar' }),
+  ])
   if (userErr || !userData.user) return json({ error: 'Geçersiz oturum' }, 401)
-  const { data: allowed } = await caller.rpc('has_perm', { p_perm: 'mesajlar' })
   if (allowed !== true) return json({ error: 'Mesaj göndermek için yetkiniz yok' }, 403)
 
   const admin = createClient(supabaseUrl, serviceKey)
@@ -40,30 +49,21 @@ Deno.serve(async (req) => {
   if (!profile?.is_active || !profile.business_id) return json({ error: 'Bu işlemi yapamazsınız' }, 403)
   const businessId = profile.business_id as string
 
-  const body = await req.json().catch(() => null)
-  const phone = typeof body?.customer_phone === 'string' ? body.customer_phone.trim() : ''
-  const message = typeof body?.message === 'string' ? body.message.trim() : ''
-  if (!phone || !message) return json({ error: 'Mesaj boş olamaz' }, 400)
-  if (message.length > MAX_LEN) return json({ error: `Mesaj en fazla ${MAX_LEN} karakter olabilir` }, 400)
-
-  const { data: business } = await admin
-    .from('businesses')
-    .select('whatsapp_phone_number_id')
-    .eq('id', businessId)
-    .maybeSingle()
+  const [{ data: business }, { data: lastIn }] = await Promise.all([
+    admin.from('businesses').select('whatsapp_phone_number_id').eq('id', businessId).maybeSingle(),
+    // Yalnizca isletmeye yazmis kisiye; serbest mesaj icin son yazisi 24 saat icinde olmali.
+    admin
+      .from('chatbot_messages')
+      .select('created_at')
+      .eq('business_id', businessId)
+      .eq('customer_phone', phone)
+      .eq('role', 'user')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
   const phoneNumberId = business?.whatsapp_phone_number_id as string | null
   if (!phoneNumberId) return json({ error: 'İşletmenin WhatsApp numarası bağlı değil' }, 409)
-
-  // Yalnizca isletmeye yazmis kisiye; serbest mesaj icin son yazisi 24 saat icinde olmali.
-  const { data: lastIn } = await admin
-    .from('chatbot_messages')
-    .select('created_at')
-    .eq('business_id', businessId)
-    .eq('customer_phone', phone)
-    .eq('role', 'user')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
   if (!lastIn) {
     return json({ error: 'Bu kişi size henüz WhatsApp’tan yazmadı; ilk mesajı müşterinin atması gerekiyor.' }, 409)
   }
@@ -83,20 +83,21 @@ Deno.serve(async (req) => {
     return json({ error: 'Mesaj gönderilemedi, birazdan tekrar deneyin.' }, 502)
   }
 
-  const { data: row, error: logErr } = await admin
-    .from('chatbot_messages')
-    .insert({ business_id: businessId, customer_phone: phone, role: 'staff', content: message })
-    .select('role, content, customer_phone, created_at')
-    .single()
-  if (logErr) console.error('send-chat-message: mesaj kaydedilemedi:', logErr.message)
-
   const until = new Date(Date.now() + PAUSE_MS).toISOString()
-  const { data: customer } = await admin
-    .from('customers')
-    .select('id, bot_paused_until')
-    .eq('business_id', businessId)
-    .eq('phone', phone)
-    .maybeSingle()
+  const [{ data: row, error: logErr }, { data: customer }] = await Promise.all([
+    admin
+      .from('chatbot_messages')
+      .insert({ business_id: businessId, customer_phone: phone, role: 'staff', content: message })
+      .select('role, content, customer_phone, created_at')
+      .single(),
+    admin
+      .from('customers')
+      .select('id, bot_paused_until')
+      .eq('business_id', businessId)
+      .eq('phone', phone)
+      .maybeSingle(),
+  ])
+  if (logErr) console.error('send-chat-message: mesaj kaydedilemedi:', logErr.message)
   if (customer && (!customer.bot_paused_until || customer.bot_paused_until < until)) {
     await admin.from('customers').update({ bot_paused_until: until }).eq('id', customer.id)
   }
