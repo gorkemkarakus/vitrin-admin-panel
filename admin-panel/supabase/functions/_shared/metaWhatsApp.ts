@@ -92,7 +92,7 @@ export async function templateStatuses(wabaId: string, token: string): Promise<G
   }
 }
 
-// Eksik sablonlari olusturur (Meta inceler, genelde dakikalar icinde onaylar).
+// Eksik sablonlari olusturur (Meta inceler; onay 24 saate kadar surebilir).
 // Var olana dokunmaz; reddedilen sablon ayni adla yeniden gonderilemez,
 // durumu oldugu gibi doner.
 export async function ensureTemplates(wabaId: string, token: string): Promise<GraphResult<TemplateStatus[]>> {
