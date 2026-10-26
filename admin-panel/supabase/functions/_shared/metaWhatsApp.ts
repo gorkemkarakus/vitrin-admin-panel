@@ -108,7 +108,12 @@ export async function ensureTemplates(wabaId: string, token: string): Promise<Gr
         name: def.name,
         language: TEMPLATE_LANG,
         category: 'UTILITY',
-        components: [{ type: 'BODY', text: def.body, example: { body_text: [def.example] } }],
+        components: [
+          { type: 'BODY', text: def.body, example: { body_text: [def.example] } },
+          ...(def.buttons?.length
+            ? [{ type: 'BUTTONS', buttons: def.buttons.map((text) => ({ type: 'QUICK_REPLY', text })) }]
+            : []),
+        ],
       }),
     })
     if (created.ok) {

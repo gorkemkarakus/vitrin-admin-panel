@@ -22,6 +22,8 @@ const BOT_HANDLERS: Record<string, (req: Request) => Promise<Response>> = {
 }
 import { isOptOutMessage } from '../_shared/marketing.ts'
 import { sendTypingIndicator, sendWhatsAppText } from '../_shared/notify.ts'
+import { appointmentParams, parseAppointmentButton, type AppointmentAction } from '../_shared/waTemplates.ts'
+import { findCustomersByPhone } from '../_shared/customerLookup.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
@@ -34,6 +36,10 @@ interface WhatsAppMessage {
   id: string
   type: string
   text?: { body: string }
+  // sablondaki hizli cevap dugmesi (hatirlatma: Geleceğim / Saati değiştir / İptal et)
+  button?: { payload?: string; text?: string }
+  // 24 saat icinde giden dugmeli mesajin cevabi
+  interactive?: { type?: string; button_reply?: { id?: string; title?: string } }
 }
 
 // Coexistence: salonun telefondaki WhatsApp Business uygulamasindan
@@ -206,6 +212,72 @@ async function answerWithChatbot(admin: SupabaseClient, payload: N8nForwardPaylo
   console.log('whatsapp-webhook: cevap gönderildi, message id:', sendResult.messageId, 'wamid:', payload.wamid)
 }
 
+// Hatirlatmadaki dugmeler: "Geleceğim" randevuyu onaylar, "İptal et" iptal
+// eder (geri alinamaz ama musteri bilerek basti), "Saati değiştir" asistana
+// yeni saati sordurur. Randevu, dugmeye basan numaranin kaydinda olmali.
+async function handleAppointmentButton(
+  admin: SupabaseClient,
+  payload: N8nForwardPayload,
+  button: { action: AppointmentAction; appointmentId: string },
+): Promise<void> {
+  if (button.action === 'reschedule') {
+    await answerWithChatbot(admin, { ...payload, message: 'Randevumun saatini değiştirmek istiyorum' })
+    return
+  }
+  if (!payload.phone_number_id) return
+  const { ids } = await findCustomersByPhone(admin, payload.business_id, payload.from, 'id')
+  const { data: appt } = ids.length
+    ? await admin
+        .from('appointments')
+        .select('id, status, scheduled_at, source_note, services(name)')
+        .eq('id', button.appointmentId)
+        .eq('business_id', payload.business_id)
+        .in('customer_id', ids)
+        .maybeSingle()
+    : { data: null }
+
+  let reply: string
+  if (!appt) {
+    reply = 'Bu randevuyu bulamadım. Yardımcı olmamı istediğiniz konuyu yazabilir misiniz?'
+  } else if (appt.status === 'iptal') {
+    reply = 'Bu randevu zaten iptal edilmiş. Yeni bir randevu isterseniz yazmanız yeterli.'
+  } else if (appt.status !== 'bekliyor' && appt.status !== 'onaylandi') {
+    reply = 'Bu randevu için işlem yapamadım. Bir sorunuz varsa yazabilirsiniz.'
+  } else if (button.action === 'confirm') {
+    if (appt.status !== 'onaylandi') {
+      const { error } = await admin.from('appointments').update({ status: 'onaylandi' }).eq('id', appt.id)
+      if (error) console.error('whatsapp-webhook: randevu onaylanamadı:', error.message)
+    }
+    reply = 'Teşekkürler, randevunuz onaylandı. Görüşmek üzere!'
+  } else {
+    const note = [appt.source_note, 'Müşteri hatırlatmadan iptal etti'].filter(Boolean).join(' | ')
+    const { error } = await admin.from('appointments').update({ status: 'iptal', source_note: note }).eq('id', appt.id)
+    if (error) {
+      console.error('whatsapp-webhook: randevu iptal edilemedi:', error.message)
+      reply = 'Randevunuzu şu an iptal edemedim. Birazdan tekrar dener misiniz?'
+    } else {
+      const service = (appt.services as { name?: string } | null)?.name ?? 'Randevu'
+      const [, , , date, time] = appointmentParams({ customerName: null, businessName: null, serviceName: service, scheduledAt: appt.scheduled_at })
+      // asistanin iptal kartiyla ayni bicim (sohbet gecmisinde islem onayi sayilir)
+      reply = `Randevunuz iptal edildi ✅
+${service} - ${date} ${time}
+Başka bir gün isterseniz buraya yazmanız yeterli.`
+    }
+  }
+
+  // basilan dugme ve cevap Mesajlar ekraninda gorunur
+  const [sent, { error: logErr }] = await Promise.all([
+    sendWhatsAppText({ phoneNumberId: payload.phone_number_id, to: payload.from, message: reply }),
+    admin.from('chatbot_messages').insert([
+      { business_id: payload.business_id, customer_phone: payload.from, role: 'user', content: payload.message || 'Düğmeye bastı' },
+      { business_id: payload.business_id, customer_phone: payload.from, role: 'assistant', content: reply },
+    ]),
+  ])
+  if (!sent.ok) console.error('whatsapp-webhook: düğme cevabı gönderilemedi:', sent.error)
+  if (logErr) console.error('whatsapp-webhook: düğme konuşması kaydedilemedi:', logErr.message)
+  console.log('whatsapp-webhook: hatırlatma düğmesi işlendi', { business_id: payload.business_id, action: button.action, found: !!appt })
+}
+
 // Yanit Meta'ya imza dogrulanir dogrulanmaz (bu fonksiyon cagrilmadan ONCE)
 // zaten 200 olarak gonderildi — o yuzden asagidaki her erken-cikis sadece
 // "daha fazla isleme yapma" anlamina geliyor, ayrica bir HTTP durum kodu
@@ -289,7 +361,10 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   // gibi). Metin ve fotograf/ses/video/dosya islenir; fotografa asistan
   // "yazabilir misiniz" der (eskiden sessizce atlaniyordu, musteri cevapsiz kaliyordu).
   const media = message ? MEDIA_TYPES[message.type ?? ''] : undefined
-  if (!message || (message.type !== 'text' && !media)) {
+  // musterinin bastigi dugme: verisi (hatirlatmada randevu islemi) ve basligi
+  const buttonPayload = message?.button?.payload ?? message?.interactive?.button_reply?.id ?? null
+  const buttonTitle = message?.button?.text ?? message?.interactive?.button_reply?.title ?? ''
+  if (!message || (message.type !== 'text' && !media && !buttonPayload)) {
     console.log('whatsapp-webhook: işlenecek metin mesajı yok (durum güncellemesi veya desteklenmeyen tip), atlanıyor')
     return
   }
@@ -325,7 +400,18 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   }
 
   const customerName = value?.contacts?.[0]?.profile?.name ?? null
-  const text = message.text?.body ?? ''
+  // taninmayan bir dugme basligi asistana yazi gibi gider
+  const text = message.text?.body ?? buttonTitle
+
+  const appointmentButton = parseAppointmentButton(buttonPayload)
+  if (appointmentButton) {
+    await handleAppointmentButton(
+      admin,
+      { business_id: business.id, phone_number_id: phoneNumberId, from: sender, customer_name: customerName, message: buttonTitle, wamid },
+      appointmentButton,
+    )
+    return
+  }
 
   // Loglarda kisisel veri yok: telefon, isim ve mesaj metni yazilmaz.
   console.log('whatsapp-webhook: parse edildi', {

@@ -35,17 +35,18 @@ export function isBusinessScopedUserId(id: string): boolean {
   return /^[A-Z]{2}\.[A-Za-z0-9.]+$/.test(id)
 }
 
-export async function sendWhatsAppText(params: {
-  phoneNumberId: string
-  to: string
-  message: string
-}): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+// Cloud API'ye tek mesaj gonderir; text / template / interactive govdesi cagirandan.
+async function postWhatsAppMessage(
+  phoneNumberId: string,
+  to: string,
+  content: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   // salonun kendi numarasiysa onun anahtari, degilse (test numarasi) WHATSAPP_TOKEN
-  const token = await whatsappAccessToken(params.phoneNumberId)
+  const token = await whatsappAccessToken(phoneNumberId)
   if (!token) return { ok: false, error: 'WhatsApp erişim anahtarı yok' }
 
   try {
-    const res = await fetch(`https://graph.facebook.com/v25.0/${params.phoneNumberId}/messages`, {
+    const res = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -57,60 +58,72 @@ export async function sendWhatsAppText(params: {
         // Telefon numarasi "to"ya, isletmeye ozel kullanici kimligi (BSUID,
         // "TR.1824..." gibi; numarasini gizleyen kullanici adli kisiler)
         // "recipient"a yazilir (Meta Cloud API).
-        ...(isBusinessScopedUserId(params.to) ? { recipient: params.to } : { to: params.to }),
-        type: 'text',
-        text: { body: params.message },
+        ...(isBusinessScopedUserId(to) ? { recipient: to } : { to }),
+        ...content,
       }),
     })
     const resBody = await res.json().catch(() => null)
-    if (!res.ok) {
-      // 24 saatlik serbest-metin penceresi kapaliysa Meta burada hata doner
-      // (ornegin #131047) — sablon-mesaj fallback'i ayri bir is, simdilik
-      // sadece cagirana hatayi donuyoruz, o loglar.
-      return { ok: false, error: JSON.stringify(resBody) }
-    }
+    // 24 saatlik serbest-metin penceresi kapaliysa duz metin ve dugmeli mesajda
+    // Meta hata doner (ornegin #131047); cagiran loglar.
+    if (!res.ok) return { ok: false, error: JSON.stringify(resBody) }
     return { ok: true, messageId: resBody?.messages?.[0]?.id ?? null }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 
+export function sendWhatsAppText(params: {
+  phoneNumberId: string
+  to: string
+  message: string
+}): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  return postWhatsAppMessage(params.phoneNumberId, params.to, { type: 'text', text: { body: params.message } })
+}
+
+// Hizli cevap dugmeli mesaj (en fazla 3 dugme, basliklar en fazla 20 karakter);
+// yalniz 24 saat penceresi icinde. Musterinin bastigi dugmenin id'si webhook'a gelir.
+export function sendWhatsAppButtons(params: {
+  phoneNumberId: string
+  to: string
+  message: string
+  buttons: { id: string; title: string }[]
+}): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  return postWhatsAppMessage(params.phoneNumberId, params.to, {
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: params.message },
+      action: { buttons: params.buttons.map((b) => ({ type: 'reply', reply: { id: b.id, title: b.title } })) },
+    },
+  })
+}
+
 // Onayli sablonla gonderim (musteri son 24 saatte yazmadiysa tek yol).
-// Sablon henuz onaylanmadiysa ya da hesapta yoksa Meta hata doner.
-export async function sendWhatsAppTemplate(params: {
+// Sablon henuz onaylanmadiysa ya da hesapta yoksa Meta hata doner. Sablonda
+// hizli cevap dugmeleri varsa her birinin geri gelecek verisi buttonPayloads'ta.
+export function sendWhatsAppTemplate(params: {
   phoneNumberId: string
   to: string
   name: string
   params: string[]
+  buttonPayloads?: string[]
 }): Promise<{ ok: boolean; error?: string; messageId?: string }> {
-  const token = await whatsappAccessToken(params.phoneNumberId)
-  if (!token) return { ok: false, error: 'WhatsApp erişim anahtarı yok' }
-
-  try {
-    const res = await fetch(`https://graph.facebook.com/v25.0/${params.phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        ...(isBusinessScopedUserId(params.to) ? { recipient: params.to } : { to: params.to }),
-        type: 'template',
-        template: {
-          name: params.name,
-          language: { code: TEMPLATE_LANG },
-          components: [{ type: 'body', parameters: params.params.map((text) => ({ type: 'text', text })) }],
-        },
-      }),
-    })
-    const resBody = await res.json().catch(() => null)
-    if (!res.ok) return { ok: false, error: JSON.stringify(resBody) }
-    return { ok: true, messageId: resBody?.messages?.[0]?.id ?? null }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
+  return postWhatsAppMessage(params.phoneNumberId, params.to, {
+    type: 'template',
+    template: {
+      name: params.name,
+      language: { code: TEMPLATE_LANG },
+      components: [
+        { type: 'body', parameters: params.params.map((text) => ({ type: 'text', text })) },
+        ...(params.buttonPayloads ?? []).map((payload, i) => ({
+          type: 'button',
+          sub_type: 'quick_reply',
+          index: String(i),
+          parameters: [{ type: 'payload', payload }],
+        })),
+      ],
+    },
+  })
 }
 
 // WhatsApp'in 24 saatlik musteri hizmeti penceresi: musteri bu isletmeye son
@@ -168,6 +181,9 @@ export async function sendCustomerMessage(
     // Musteri son 24 saatte yazmadiysa bu onayli sablonla gider (message
     // sablonun doldurulmus hali olmali; pencere aciksa duz metin gider).
     template?: { key: TemplateKey; params: string[] }
+    // hizli cevap dugmeleri: sablonda sablonun dugmeleri, pencere aciksa
+    // ayni basliklarla dugmeli mesaj (id'ler musteri basinca webhook'a gelir)
+    buttons?: { id: string; title: string }[]
   },
 ): Promise<{ ok: boolean; error?: string }> {
   if (!params.phone) {
@@ -210,8 +226,11 @@ export async function sendCustomerMessage(
         to,
         name: TEMPLATES[params.template!.key].name,
         params: params.template!.params,
+        buttonPayloads: params.buttons?.map((b) => b.id),
       })
-    : await sendWhatsAppText({ phoneNumberId: params.phoneNumberId, to, message: params.message })
+    : params.buttons?.length
+      ? await sendWhatsAppButtons({ phoneNumberId: params.phoneNumberId, to, message: params.message, buttons: params.buttons })
+      : await sendWhatsAppText({ phoneNumberId: params.phoneNumberId, to, message: params.message })
   if (!result.ok) {
     console.error(`sendCustomerMessage: WhatsApp ${useTemplate ? 'şablon' : 'metin'} gönderimi başarısız:`, result.error)
     return { ok: true }

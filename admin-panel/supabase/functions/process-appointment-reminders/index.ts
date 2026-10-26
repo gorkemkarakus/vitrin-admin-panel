@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendCustomerMessage } from '../_shared/notify.ts'
-import { appointmentParams, renderTemplate } from '../_shared/waTemplates.ts'
+import { appointmentButtons, appointmentParams, renderTemplate } from '../_shared/waTemplates.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
 
 // pg_cron tarafindan her 15 dakikada bir cagirilir (bkz.
@@ -75,6 +75,8 @@ Deno.serve(async (req) => {
       kind: 'reminder',
       message: renderTemplate('reminder', templateParams),
       template: { key: 'reminder', params: templateParams },
+      // Geleceğim / Saati değiştir / İptal et (whatsapp-webhook isler)
+      buttons: appointmentButtons(appt.id),
     })
     if (result.ok) {
       await admin.from('appointments').update({ reminder_sent_at: new Date().toISOString() }).eq('id', appt.id)

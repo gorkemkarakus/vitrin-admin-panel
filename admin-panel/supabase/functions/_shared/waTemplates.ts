@@ -12,6 +12,9 @@ export interface TemplateDef {
   // {{1}} ad, {{2}} salon, {{3}} hizmet, {{4}} tarih, {{5}} saat
   body: string
   example: string[]
+  // hizli cevap dugmeleri (en fazla 20 karakter); sirasi gonderimdeki
+  // dugme verisiyle (appointmentButtons) ayni
+  buttons?: string[]
 }
 
 const EXAMPLE = ['Ayşe', 'Güzel Salon', 'Pedikür', '30 Ekim Cuma', '14:00']
@@ -22,11 +25,27 @@ export const TEMPLATES: Record<TemplateKey, TemplateDef> = {
     body: 'Merhaba {{1}}, {{2}} randevunuz oluşturuldu: {{3}}, {{4}} saat {{5}}. Bir değişiklik olursa bu mesaja yazmanız yeterli. Görüşmek üzere!',
     example: EXAMPLE,
   },
+  // Dugmeli surum: musteri tek dokunusla onaylar, iptal eder ya da saati
+  // degistirmek ister (eski dugmesiz 'adapptiv_randevu_hatirlatma' kullanilmiyor).
   reminder: {
-    name: 'adapptiv_randevu_hatirlatma',
-    body: 'Merhaba {{1}}, {{2}} randevunuzu hatırlatmak isteriz: {{3}}, {{4}} saat {{5}}. Bir değişiklik olursa bu mesaja yazmanız yeterli. Görüşmek üzere!',
+    name: 'adapptiv_hatirlatma_onay',
+    body: 'Merhaba {{1}}, {{2}} randevunuzu hatırlatmak isteriz: {{3}}, {{4}} saat {{5}}. Gelebilecek misiniz?',
     example: EXAMPLE,
+    buttons: ['Geleceğim', 'Saati değiştir', 'İptal et'],
   },
+}
+
+// Hatirlatma dugmelerinin musteriden geri gelen verisi: "appt:<islem>:<randevu id>"
+export type AppointmentAction = 'confirm' | 'reschedule' | 'cancel'
+const BUTTON_ACTIONS: AppointmentAction[] = ['confirm', 'reschedule', 'cancel']
+
+export function appointmentButtons(appointmentId: string): { id: string; title: string }[] {
+  return (TEMPLATES.reminder.buttons ?? []).map((title, i) => ({ id: `appt:${BUTTON_ACTIONS[i]}:${appointmentId}`, title }))
+}
+
+export function parseAppointmentButton(payload: string | null | undefined): { action: AppointmentAction; appointmentId: string } | null {
+  const m = (payload ?? '').match(/^appt:(confirm|reschedule|cancel):([0-9a-f-]{36})$/i)
+  return m ? { action: m[1] as AppointmentAction, appointmentId: m[2].toLowerCase() } : null
 }
 
 export function renderTemplate(key: TemplateKey, params: string[]): string {

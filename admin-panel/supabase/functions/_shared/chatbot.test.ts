@@ -6,6 +6,7 @@ import { askForSurname, askTodayOrNextWeek, askWhichCancel, bookingInsteadOfCanc
 import { botNamedDate, isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
 import { phoneVariants } from './customerLookup.ts'
+import { appointmentButtons, parseAppointmentButton } from './waTemplates.ts'
 
 const BASE = 'https://ornek.supabase.co'
 const input: ChatbotInput = {
@@ -934,4 +935,18 @@ Deno.test('musteri numarasi butun yazilislariyla aranir (uygulamada 0532, WhatsA
   assertEquals(phoneVariants('ig:17841400000000000'), ['ig:17841400000000000'])
   assertEquals(phoneVariants('TR.1824962542022888'), ['TR.1824962542022888'])
   assertEquals(phoneVariants('79991234567'), ['79991234567'])
+})
+
+Deno.test('hatirlatma dugmeleri: randevu kimligiyle gider, geri gelince taninir', () => {
+  const id = '3f1c2a4b-5d6e-4f70-8a9b-0c1d2e3f4a5b'
+  const buttons = appointmentButtons(id)
+  assertEquals(buttons.map((b) => b.title), ['Geleceğim', 'Saati değiştir', 'İptal et'])
+  assert(buttons.every((b) => b.title.length <= 20))
+  assertEquals(parseAppointmentButton(buttons[0].id), { action: 'confirm', appointmentId: id })
+  assertEquals(parseAppointmentButton(buttons[1].id), { action: 'reschedule', appointmentId: id })
+  assertEquals(parseAppointmentButton(buttons[2].id), { action: 'cancel', appointmentId: id })
+  // baska dugmeler ya da bozuk veri islem yapmaz
+  assertEquals(parseAppointmentButton('Geleceğim'), null)
+  assertEquals(parseAppointmentButton('appt:delete:' + id), null)
+  assertEquals(parseAppointmentButton(null), null)
 })
