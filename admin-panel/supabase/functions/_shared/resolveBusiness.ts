@@ -4,7 +4,7 @@ import { sha256Hex, timingSafeEqualString } from './crypto.ts'
 // Isletmeyi iki yoldan biriyle bulur:
 // - x-api-key header'i: isletmeye ozel anahtar (n8n akislari, test araclari).
 // - whatsapp_phone_number_id: cok isletmeli WhatsApp'ta gelen mesajin hangi
-//   numaraya geldigi. Numara kimligi gizli bir bilgi DEGILDIR (Meta panelinde,
+//   numaraya geldigi (Instagram'da "ig:<hesap kimligi>"). Numara kimligi gizli bir bilgi DEGILDIR (Meta panelinde,
 //   webhook olaylarinda gorunur); bu yuzden bu yol yalnizca
 //   - Meta imzasi dogrulanmis whatsapp-webhook icinden (trusted: true) ya da
 //   - paylasilan gizli basligi (x-bot-secret) dogru gonderen cagiranlar
@@ -23,6 +23,18 @@ export async function resolveBusiness(
   }
   if (phoneNumberId) {
     if (!opts.trusted && !(await hasValidBotSecret(admin, req))) return null
+    // Instagram: asistan isletmenin hesabini "ig:<hesap kimligi>" olarak gecirir
+    // (bot fonksiyonlarinin phone_number_id alani kanal hesabini tasir).
+    if (phoneNumberId.startsWith('ig:')) {
+      const { data: conn } = await admin
+        .from('business_instagram_connections')
+        .select('business_id')
+        .eq('ig_user_id', phoneNumberId.slice(3))
+        .maybeSingle()
+      if (!conn) return null
+      const { data } = await admin.from('businesses').select('id, name').eq('id', conn.business_id).maybeSingle()
+      return data ?? null
+    }
     const { data } = await admin
       .from('businesses')
       .select('id, name')

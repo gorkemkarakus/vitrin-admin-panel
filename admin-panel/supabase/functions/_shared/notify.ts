@@ -184,6 +184,9 @@ export async function sendCustomerMessage(
   if (logError) return { ok: false, error: logError.message }
 
   if (!params.phoneNumberId) return { ok: true }
+  // Instagram'dan gelip telefonunu vermemis musteri ("ig:..."): WhatsApp'tan
+  // ulasilamaz (Instagram 24 saat disinda mesaja izin vermez); yalniz log kalir.
+  if (params.phone.startsWith('ig:')) return { ok: true }
 
   // Asagidaki hicbir dal exception firlatmiyor / ok:false dondurmuyor —
   // notification_log zaten yazildi (denetim izi korunuyor), bu yuzden bir

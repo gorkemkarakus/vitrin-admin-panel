@@ -50,6 +50,18 @@ verify_jwt = false
 [functions.whatsapp-connect-complete]
 verify_jwt = false
 
+# Instagram DM'leri (Meta imzasiyla dogrulanir).
+[functions.instagram-webhook]
+verify_jwt = false
+
+# Sitedeki Instagram baglama sayfasi cagirir; kimlik tek kullanimlik oturum kodudur.
+[functions.instagram-connect-complete]
+verify_jwt = false
+
+# pg_cron x-webhook-secret ile cagirir (Instagram anahtarlarini yeniler).
+[functions.instagram-refresh-tokens]
+verify_jwt = false
+
 # Gercek Supabase kullanici JWT'si (Authorization header) gerektiren
 # fonksiyonlar — varsayilan zaten budur, tutarlilik icin acikca yazildi.
 [functions.chatbot-context]
@@ -64,6 +76,12 @@ verify_jwt = true
 
 # WhatsApp hesabi ekrani: sablon durumlari / kurulum (yonetici).
 [functions.whatsapp-templates]
+verify_jwt = true
+
+[functions.instagram-connect-start]
+verify_jwt = true
+
+[functions.instagram-disconnect]
 verify_jwt = true
 
 [functions.parse-appointment-command]
