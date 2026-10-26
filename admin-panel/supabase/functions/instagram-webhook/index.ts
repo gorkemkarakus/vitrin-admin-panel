@@ -4,6 +4,7 @@ import { timingSafeEqualString } from '../_shared/crypto.ts'
 import { botSharedSecret } from '../_shared/resolveBusiness.ts'
 import { runChatbot, type MediaKind } from '../_shared/chatbot.ts'
 import { pauseBotForCustomer } from '../_shared/botPause.ts'
+import { recordAdReferral } from '../_shared/adReferrals.ts'
 import {
   getUserName,
   igCustomerId,
@@ -41,6 +42,8 @@ interface IgMessage {
   is_echo?: boolean
   is_deleted?: boolean
   attachments?: { type?: string }[]
+  // "Instagram Direct'e mesaj gönder" reklamindan gelen mesajda reklam bilgisi
+  referral?: { ad_id?: string; source?: string; ads_context_data?: { ad_title?: string } }
 }
 
 // Instagram ek turleri: paylasilan gonderi/reel de gorsel sayilir ("bu modeli
@@ -181,6 +184,15 @@ async function handleMessage(admin: SupabaseClient, igUserId: string, ev: IgMess
   }
   const customerId = igCustomerId(senderIgsid)
   const text = msg.text ?? ''
+
+  // reklamdan gelen konusma: asistan randevu acarsa reklama baglansin diye once kaydedilir
+  if (msg.referral && (msg.referral.source === 'ADS' || msg.referral.ad_id)) {
+    await recordAdReferral(admin, conn.businessId, customerId, {
+      channel: 'instagram',
+      adId: msg.referral.ad_id,
+      title: msg.referral.ads_context_data?.ad_title,
+    })
+  }
 
   // Loglarda kisisel veri yok: kimlik, isim ve mesaj metni yazilmaz.
   console.log('instagram-webhook: mesaj alındı', { business_id: conn.businessId, text_length: text.length })

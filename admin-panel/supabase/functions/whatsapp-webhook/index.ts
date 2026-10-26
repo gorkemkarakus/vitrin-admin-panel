@@ -24,6 +24,7 @@ import { isOptOutMessage } from '../_shared/marketing.ts'
 import { sendTypingIndicator, sendWhatsAppText } from '../_shared/notify.ts'
 import { appointmentParams, parseAppointmentButton, type AppointmentAction } from '../_shared/waTemplates.ts'
 import { findCustomersByPhone } from '../_shared/customerLookup.ts'
+import { recordAdReferral } from '../_shared/adReferrals.ts'
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
@@ -40,6 +41,8 @@ interface WhatsAppMessage {
   button?: { payload?: string; text?: string }
   // 24 saat icinde giden dugmeli mesajin cevabi
   interactive?: { type?: string; button_reply?: { id?: string; title?: string } }
+  // "WhatsApp'a mesaj gönder" reklamindan gelen ilk mesajda reklam bilgisi
+  referral?: { source_id?: string; source_type?: string; source_url?: string; headline?: string; body?: string; ctwa_clid?: string }
 }
 
 // Coexistence: salonun telefondaki WhatsApp Business uygulamasindan
@@ -402,6 +405,18 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   const customerName = value?.contacts?.[0]?.profile?.name ?? null
   // taninmayan bir dugme basligi asistana yazi gibi gider
   const text = message.text?.body ?? buttonTitle
+
+  // reklamdan gelen konusma: asistan bu mesajda randevu acarsa reklama baglansin diye once kaydedilir
+  if (message.referral) {
+    await recordAdReferral(admin, business.id, sender, {
+      channel: 'whatsapp',
+      adId: message.referral.source_id,
+      title: message.referral.headline,
+      body: message.referral.body,
+      sourceUrl: message.referral.source_url,
+      clickId: message.referral.ctwa_clid,
+    })
+  }
 
   const appointmentButton = parseAppointmentButton(buttonPayload)
   if (appointmentButton) {

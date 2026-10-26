@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
 import { findCustomersByPhone } from '../_shared/customerLookup.ts'
+import { latestAdReferral } from '../_shared/adReferrals.ts'
 import {
   SLOT_MINUTES,
   toMinutes,
@@ -233,6 +234,9 @@ export async function handler(req: Request): Promise<Response> {
       contact_phone: string | null
     }>(admin, biz.id, channelPhone, 'id, full_name, contact_phone')
 
+    // kisi son 30 gunde Meta reklamindan yazdiysa randevu o reklama sayilir
+    const adReferralId = await latestAdReferral(admin, biz.id, channelPhone)
+
     let customerId = existingCustomer?.id
     if (!customerId) {
       const { data: newCustomer, error: custErr } = await admin
@@ -242,6 +246,7 @@ export async function handler(req: Request): Promise<Response> {
           full_name: customer_name,
           phone: customer_phone,
           contact_phone: contact_phone ?? null,
+          ...(adReferralId ? { source: 'reklam' } : {}),
         })
         .select('id')
         .single()
@@ -284,6 +289,7 @@ export async function handler(req: Request): Promise<Response> {
         duration_minutes: duration,
         source: 'chatbot',
         source_note: combinedNote,
+        ad_referral_id: adReferralId,
       })
       .select('id, scheduled_at')
       .single()
