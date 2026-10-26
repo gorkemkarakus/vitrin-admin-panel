@@ -2,7 +2,8 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { corsHeaders, json } from '../_shared/http.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
 import { botSharedSecret } from '../_shared/resolveBusiness.ts'
-import { runChatbot } from '../_shared/chatbot.ts'
+import { runChatbot, type MediaKind } from '../_shared/chatbot.ts'
+import { pauseBotForCustomer } from '../_shared/botPause.ts'
 import {
   getUserName,
   igCustomerId,
@@ -39,7 +40,28 @@ interface IgMessage {
   text?: string
   is_echo?: boolean
   is_deleted?: boolean
-  attachments?: unknown[]
+  attachments?: { type?: string }[]
+}
+
+// Instagram ek turleri: paylasilan gonderi/reel de gorsel sayilir ("bu modeli
+// istiyorum"); hikayede etiketlenme, kalp gibi ekler cevaplanmaz.
+const IG_MEDIA: Record<string, MediaKind> = {
+  image: 'image',
+  share: 'image',
+  ig_reel: 'image',
+  reel: 'image',
+  ig_post: 'image',
+  video: 'video',
+  audio: 'audio',
+  file: 'document',
+}
+
+function igMediaKind(attachments: IgMessage['attachments']): MediaKind | undefined {
+  for (const a of attachments ?? []) {
+    const kind = IG_MEDIA[a?.type ?? '']
+    if (kind) return kind
+  }
+  return undefined
 }
 
 interface IgMessagingEvent {
@@ -138,8 +160,10 @@ async function handleMessage(admin: SupabaseClient, igUserId: string, ev: IgMess
   const msg = ev.message
   const senderIgsid = ev.sender?.id
   if (!msg?.mid || !senderIgsid || msg.is_deleted) return
-  // Simdilik yalniz metin; fotograf/ses/sticker atlanir (WhatsApp'taki gibi).
-  if (!msg.text) {
+  // Metin ya da fotograf/ses/video/dosya (asistan "yazabilir misiniz" der);
+  // diger ekler atlanir.
+  const media = msg.text ? undefined : igMediaKind(msg.attachments)
+  if (!msg.text && !media) {
     console.log('instagram-webhook: metin olmayan mesaj, atlanıyor')
     return
   }
@@ -156,7 +180,7 @@ async function handleMessage(admin: SupabaseClient, igUserId: string, ev: IgMess
     return
   }
   const customerId = igCustomerId(senderIgsid)
-  const text = msg.text
+  const text = msg.text ?? ''
 
   // Loglarda kisisel veri yok: kimlik, isim ve mesaj metni yazilmaz.
   console.log('instagram-webhook: mesaj alındı', { business_id: conn.businessId, text_length: text.length })
@@ -200,6 +224,7 @@ async function handleMessage(admin: SupabaseClient, igUserId: string, ev: IgMess
         customer_name: customerName,
         message: text,
         wamid: msg.mid,
+        ...(media ? { media } : {}),
       },
       { supabaseUrl, anonKey, openaiKey, botSecret, handlers: BOT_HANDLERS },
     )
@@ -207,13 +232,16 @@ async function handleMessage(admin: SupabaseClient, igUserId: string, ev: IgMess
     console.error('instagram-webhook: asistan hatası:', e instanceof Error ? e.message : e)
     return
   }
+  // musteri temsilciye aktarilmak istedi: bu kiside asistan susar
+  const handover = result.handover ? pauseBotForCustomer(admin, conn.businessId, customerId) : Promise.resolve()
   if (!result.reply.trim()) {
-    await result.log
+    await Promise.all([result.log, handover])
     return
   }
   const [sent] = await Promise.all([
     sendInstagramText({ token: conn.token, recipientIgsid: senderIgsid, message: result.reply.trim() }),
     result.log,
+    handover,
   ])
   if (!sent.ok) {
     console.error('instagram-webhook: cevap gönderilemedi:', sent.error)

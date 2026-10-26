@@ -12,6 +12,9 @@
 import * as flow from './chatbotFlow.js'
 import { fromResponsesResponse, toResponsesRequest } from './openaiResponses.ts'
 
+// Metin disi mesaj (fotograf, ses...): bot goremez, musteriden yazmasini ister
+export type MediaKind = 'image' | 'video' | 'audio' | 'document'
+
 export interface ChatbotInput {
   business_id: string
   phone_number_id: string | null
@@ -19,6 +22,7 @@ export interface ChatbotInput {
   customer_name: string | null
   message: string
   wamid: string
+  media?: MediaKind
 }
 
 export interface ChatbotDeps {
@@ -39,6 +43,8 @@ export interface ChatbotResult {
   reply: string
   // cevap kaydi; gonderimle ayni anda beklenir
   log: Promise<void>
+  // musteri temsilciye aktarilmak istedi: webhook bu musteride botu susturur
+  handover?: boolean
 }
 
 type Json = Record<string, unknown>
@@ -286,6 +292,52 @@ export function stripEmoji(reply: string, customerMessage: string): string {
   return /[\p{L}\d]$/u.test(stripped) && /\p{Extended_Pictographic}\uFE0F?\s*$/u.test(reply) ? stripped + '.' : stripped
 }
 
+// Mesajlar ekraninda musterinin gonderdigi fotograf/ses yerine gorunen satir
+// (asil icerik salonun telefonundaki WhatsApp / Instagram uygulamasinda).
+export const MEDIA_LABELS: Record<MediaKind, string> = {
+  image: '📷 Fotoğraf gönderdi',
+  video: '🎬 Video gönderdi',
+  audio: '🎤 Sesli mesaj gönderdi',
+  document: '📎 Dosya gönderdi',
+}
+const MEDIA_CANT: Record<MediaKind, string> = {
+  image: 'Maalesef fotoğrafları göremiyorum.',
+  video: 'Maalesef videoları göremiyorum.',
+  audio: 'Maalesef sesli mesajları dinleyemiyorum.',
+  document: 'Maalesef dosyaları açamıyorum.',
+}
+const HANDOVER_OFFER = 'sizi salonumuzdan bir temsilciye aktarayım.'
+
+// Fotograf/ses gelince: once yazmasi istenir; mutlaka gostermesi gerekiyorsa
+// salona aktarilmayi teklif eder (eskiden bu mesajlar sessizce kayboluyordu).
+export function mediaReply(kind: MediaKind): string {
+  const offer = kind === 'audio' ? 'Yazmanız mümkün değilse belirtin, ' : 'Mutlaka göstermeniz gerekiyorsa belirtin, '
+  return `${MEDIA_CANT[kind]} İsteğinizi kısaca yazabilir misiniz? ${offer}${HANDOVER_OFFER}`
+}
+
+function lastAssistantText(context: Json): string {
+  const history = Array.isArray(context.history) ? (context.history as { role?: string; content?: unknown }[]) : []
+  return String([...history].reverse().find((h) => h.role === 'assistant')?.content ?? '')
+}
+
+// Bot aktarmayi teklif ettikten sonra musteri bunu isterse ("göstermem lazım",
+// "aktarın", "yazamıyorum") bot susar, konusma salonda "yanıt bekliyor" olur.
+// "Tamam", "evet" yazacagim da demek olabilir: onlarla aktarilmaz.
+export function wantsHandover(message: string, context: Json): boolean {
+  if (!lastAssistantText(context).endsWith(HANDOVER_OFFER)) return false
+  const t = message.toLocaleLowerCase('tr')
+  // uzun mesaj: musteri istegini yazmis, bot normal devam eder
+  if (t.length > 80) return false
+  if (/gerek yok|gerekmiyor|lazım değil|şart değil|yazayım|yazarım|yazıyorum/.test(t)) return false
+  return /aktar|temsilci|yetkili|birisi|biriyle|insan|göster|gerek|lazım|şart|yazamı|yazamam/.test(t)
+}
+
+export function handoverReply(context: Json): string {
+  return /dinleyemiyorum/.test(lastAssistantText(context))
+    ? 'Tamam, sizi salonumuzdan bir temsilciye aktardım. En kısa sürede buradan size dönüş yapılacak.'
+    : 'Tamam, sizi salonumuzdan bir temsilciye aktardım. Göstermek istediğinizi buradan gönderebilirsiniz, en kısa sürede size dönüş yapılacak.'
+}
+
 // Model az onceki ✅ islemini bazen inkar ediyordu ("önceki mesajım iptalin
 // sistemde tamamlandığını doğrulamıyor"; bot testinde 8'de 1). Son mesaj ✅
 // kartiysa ve cevap suphe bildiriyorsa islem dogrulanir.
@@ -418,7 +470,8 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
   // adli kisi, "TR.1824...") personel kontrolu yapilmaz. Personel kontrolu
   // hata verirse de (ör. 400) musteri asistani susmasin, musteri sayilir.
   const isPhone = /^\+?\d{8,15}$/.test(input.from)
-  const staff: Json = isPhone
+  // personel komutlari yazili; fotograf/ses personel kontrolune gitmez
+  const staff: Json = isPhone && !input.media
     ? await timed(
         'personel',
         fn('staff-whatsapp-webhook', { phone: input.from, message: input.message, phone_number_id: input.phone_number_id }, 15000, true),
@@ -434,8 +487,28 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
 
   const context = await contextPromise
   outputs['Get Context'] = context
-  // Personel elle devraldiysa ya da numara bir isletmeye bagli degilse bot susar.
-  if (context.bot_paused === true || !context.business_name) return { reply: '', log: noLog }
+  const logTurns = (messages: { role: 'user' | 'assistant'; content: string }[]) =>
+    fn('chatbot-log-message', { customer_phone: input.from, phone_number_id: input.phone_number_id, messages }, 10000).then(
+      () => undefined,
+      (e) => console.error('chatbot: mesaj kaydi basarisiz:', e instanceof Error ? e.message : e, 'wamid:', input.wamid),
+    )
+  const userContent = input.media ? MEDIA_LABELS[input.media] : input.message
+  // Numara bir isletmeye bagli degilse bot susar.
+  if (!context.business_name) return { reply: '', log: noLog }
+  // Salon devraldiysa bot susar ama musterinin yazdigi (fotograf dahil) Mesajlar
+  // ekraninda gorunsun; eskiden hic kaydedilmiyordu. Paket asistani kapsamiyorsa kayit yok.
+  if (context.bot_paused === true) {
+    return { reply: '', log: context.plan_blocked === true ? noLog : logTurns([{ role: 'user', content: userContent }]) }
+  }
+  if (input.media || wantsHandover(input.message, context)) {
+    const reply = input.media ? mediaReply(input.media) : handoverReply(context)
+    logTimings(input.media ? 'medya' : 'temsilci')
+    return {
+      reply,
+      log: logTurns([{ role: 'user', content: userContent }, { role: 'assistant', content: reply }]),
+      handover: !input.media,
+    }
+  }
 
   const reschedule = confirmedReschedule(input.message, context)
   let parsed: Json
@@ -562,20 +635,9 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
   )
   const reply = !guardQuestion && parsed.hasToolCall !== true ? stripEmoji(cleaned, input.message) : cleaned
   replyStep.reply = reply
-  const log = fn(
-    'chatbot-log-message',
-    {
-      customer_phone: replyStep.customer_phone,
-      phone_number_id: input.phone_number_id,
-      messages: [
-        { role: 'user', content: replyStep.message },
-        { role: 'assistant', content: replyStep.reply },
-      ],
-    },
-    10000,
-  ).then(
-    () => undefined,
-    (e) => console.error('chatbot: mesaj kaydi basarisiz:', e instanceof Error ? e.message : e, 'wamid:', input.wamid),
-  )
+  const log = logTurns([
+    { role: 'user', content: input.message },
+    { role: 'assistant', content: reply },
+  ])
   return { reply, log }
 }

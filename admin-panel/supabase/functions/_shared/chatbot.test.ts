@@ -2,7 +2,7 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { askForSurname, askTodayOrNextWeek, askWhichCancel, bookingInsteadOfCancel, confirmHypotheticalReschedule, lateNotice, earlyHourQuestionText, fixEchoedTypos, looksLikeEnglish, lowercaseServiceNames, misreadCustomerName, runChatbot, stripEmoji, vagueCancelQuestion, confirmOwnAction, type ChatbotInput } from './chatbot.ts'
+import { askForSurname, askTodayOrNextWeek, askWhichCancel, bookingInsteadOfCancel, confirmHypotheticalReschedule, lateNotice, earlyHourQuestionText, fixEchoedTypos, looksLikeEnglish, lowercaseServiceNames, mediaReply, misreadCustomerName, runChatbot, stripEmoji, vagueCancelQuestion, confirmOwnAction, wantsHandover, type ChatbotInput } from './chatbot.ts'
 import { botNamedDate, isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
 
@@ -67,14 +67,89 @@ Deno.test('personel numarasi: komut asistaninin cevabi doner, musteri asistani c
   assertEquals(staff.body, { phone: input.from, message: input.message, phone_number_id: 'pn-1' })
 })
 
-Deno.test('bot susturulmus: bos cevap, OpenAI cagrilmaz', async () => {
+Deno.test('bot susturulmus: bos cevap, OpenAI cagrilmaz, musterinin yazdigi yine kaydedilir', async () => {
   const calls: Call[] = []
   const r = await runChatbot(
     input,
-    deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: false }, 'chatbot-context': { ...context, bot_paused: true } }, calls)),
+    deps(
+      fakeFetch(
+        { 'staff-whatsapp-webhook': { handled: false }, 'chatbot-context': { ...context, bot_paused: true }, 'chatbot-log-message': { ok: true } },
+        calls,
+      ),
+    ),
   )
+  await r.log
   assertEquals(r.reply, '')
   assert(!calls.some((c) => c.url.includes('openai')))
+  // salon devraldi: musterinin mesaji Mesajlar ekraninda gorunsun
+  assertEquals(calls.find((c) => c.url.endsWith('chatbot-log-message'))!.body.messages, [{ role: 'user', content: 'Merhaba' }])
+})
+
+Deno.test('paket asistani kapsamiyor: kayit da yapilmaz', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    input,
+    deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: false }, 'chatbot-context': { business_name: 'Güzel Salon', bot_paused: true, plan_blocked: true } }, calls)),
+  )
+  await r.log
+  assertEquals(r.reply, '')
+  assert(!calls.some((c) => c.url.endsWith('chatbot-log-message')))
+})
+
+Deno.test('fotograf: OpenAI cagrilmaz, yazmasi istenir, Mesajlar icin "Fotoğraf gönderdi" kaydedilir', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, message: '', media: 'image' },
+    deps(fakeFetch({ 'chatbot-context': context, 'chatbot-log-message': { ok: true } }, calls)),
+  )
+  await r.log
+  assertEquals(
+    r.reply,
+    'Maalesef fotoğrafları göremiyorum. İsteğinizi kısaca yazabilir misiniz? Mutlaka göstermeniz gerekiyorsa belirtin, sizi salonumuzdan bir temsilciye aktarayım.',
+  )
+  assert(!r.handover)
+  assert(!calls.some((c) => c.url.includes('openai') || c.url.endsWith('staff-whatsapp-webhook')))
+  assertEquals(calls.find((c) => c.url.endsWith('chatbot-log-message'))!.body.messages, [
+    { role: 'user', content: '📷 Fotoğraf gönderdi' },
+    { role: 'assistant', content: r.reply },
+  ])
+})
+
+Deno.test('sesli mesaj: yazamiyorsa aktarilmayi teklif eder', () => {
+  assertEquals(
+    mediaReply('audio'),
+    'Maalesef sesli mesajları dinleyemiyorum. İsteğinizi kısaca yazabilir misiniz? Yazmanız mümkün değilse belirtin, sizi salonumuzdan bir temsilciye aktarayım.',
+  )
+})
+
+Deno.test('aktarma teklifinden sonra "göstermem lazım": temsilciye aktarilir, bot susar', async () => {
+  const calls: Call[] = []
+  const history = [
+    { role: 'user', content: '📷 Fotoğraf gönderdi' },
+    { role: 'assistant', content: mediaReply('image') },
+  ]
+  const r = await runChatbot(
+    { ...input, message: 'fotoğrafı göstermem lazım' },
+    deps(fakeFetch({ 'staff-whatsapp-webhook': { handled: false }, 'chatbot-context': { ...context, history }, 'chatbot-log-message': { ok: true } }, calls)),
+  )
+  await r.log
+  assert(r.handover)
+  assert(r.reply.startsWith('Tamam, sizi salonumuzdan bir temsilciye aktardım.'), r.reply)
+  assert(!calls.some((c) => c.url.includes('openai')))
+})
+
+Deno.test('aktarma istegi yalniz acik ifadelerle anlasilir', () => {
+  const ctx = { history: [{ role: 'assistant', content: mediaReply('image') }] }
+  assert(wantsHandover('temsilciye aktarın', ctx))
+  assert(wantsHandover('göstermem gerekiyor', ctx))
+  assert(wantsHandover('yazamıyorum', ctx))
+  // "tamam/evet" yazacagim demek olabilir; istegini yazdiysa bot devam eder
+  assert(!wantsHandover('tamam', ctx))
+  assert(!wantsHandover('evet', ctx))
+  assert(!wantsHandover('gerek yok yazayım, yarın 14:00 boya', ctx))
+  assert(!wantsHandover('bu saç modelini istiyorum, uzun saçlara katlı kesim, ombre de olsun ama çok açık olmasın, yarın öğleden sonra', ctx))
+  // teklif edilmediyse aktarma yok
+  assert(!wantsHandover('temsilciye aktarın', { history: [{ role: 'assistant', content: 'Fön 250 TL.' }] }))
 })
 
 Deno.test('sohbet: OpenAI cevabi gider, mesaj ve cevap kaydedilir', async () => {

@@ -2,7 +2,8 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { corsHeaders, json } from '../_shared/http.ts'
 import { timingSafeEqualString } from '../_shared/crypto.ts'
 import { botSharedSecret, resolveBusiness } from '../_shared/resolveBusiness.ts'
-import { runChatbot } from '../_shared/chatbot.ts'
+import { runChatbot, type MediaKind } from '../_shared/chatbot.ts'
+import { pauseBotForCustomer } from '../_shared/botPause.ts'
 import { handler as staffHandler } from '../staff-whatsapp-webhook/handler.ts'
 import { handler as contextHandler } from '../chatbot-context/handler.ts'
 import { handler as bookHandler } from '../book-appointment/handler.ts'
@@ -85,7 +86,12 @@ interface N8nForwardPayload {
   customer_name: string | null
   message: string
   wamid: string
+  media?: MediaKind
 }
+
+// Musterinin gonderebildigi metin disi mesajlar; cikartma, tepki, konum gibi
+// tiplere cevap verilmez.
+const MEDIA_TYPES: Record<string, MediaKind> = { image: 'image', video: 'video', audio: 'audio', document: 'document' }
 
 // n8n cagrisi zaten processWebhookEvent'in (EdgeRuntime.waitUntil ile
 // sarilmis) icinde calisiyor — ayrica ikinci bir waitUntil GEREKMIYOR, tek
@@ -181,14 +187,17 @@ async function answerWithChatbot(admin: SupabaseClient, payload: N8nForwardPaylo
     return
   }
   await typing
+  // musteri temsilciye aktarilmak istedi: bu kiside asistan susar
+  const handover = result.handover ? pauseBotForCustomer(admin, payload.business_id, payload.from) : Promise.resolve()
   if (!result.reply.trim()) {
     console.log('whatsapp-webhook: asistan boş cevap döndürdü (personel devraldı ya da işletme yok), gönderim atlanıyor')
-    await result.log
+    await Promise.all([result.log, handover])
     return
   }
   const [sendResult] = await Promise.all([
     sendWhatsAppText({ phoneNumberId: payload.phone_number_id, to: payload.from, message: result.reply.trim() }),
     result.log,
+    handover,
   ])
   if (!sendResult.ok) {
     console.error('whatsapp-webhook: cevap gönderimi başarısız:', sendResult.error, 'wamid:', payload.wamid)
@@ -293,9 +302,10 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
   }
 
   // messages dizisi bos olabilir (durum guncellemesi — delivered/read/sent
-  // gibi) ya da metin disi bir tip (image/audio/location/...) gelebilir;
-  // Gorev 2 kapsaminda sadece metin mesajlari isleniyor.
-  if (!message || message.type !== 'text') {
+  // gibi). Metin ve fotograf/ses/video/dosya islenir; fotografa asistan
+  // "yazabilir misiniz" der (eskiden sessizce atlaniyordu, musteri cevapsiz kaliyordu).
+  const media = message ? MEDIA_TYPES[message.type ?? ''] : undefined
+  if (!message || (message.type !== 'text' && !media)) {
     console.log('whatsapp-webhook: işlenecek metin mesajı yok (durum güncellemesi veya desteklenmeyen tip), atlanıyor')
     return
   }
@@ -382,10 +392,14 @@ async function processWebhookEvent(admin: SupabaseClient, req: Request, rawBody:
     customer_name: customerName,
     message: text,
     wamid,
+    ...(media ? { media } : {}),
   }
-  // BOT_ENGINE=n8n: eski n8n akisina geri donus (yedek)
-  if (Deno.env.get('BOT_ENGINE') === 'n8n') await forwardToN8n(botPayload)
-  else await answerWithChatbot(admin, botPayload)
+  // BOT_ENGINE=n8n: eski n8n akisina geri donus (yedek; fotograf/ses bilmez)
+  if (Deno.env.get('BOT_ENGINE') === 'n8n') {
+    if (!media) await forwardToN8n(botPayload)
+  } else {
+    await answerWithChatbot(admin, botPayload)
+  }
 }
 
 Deno.serve(async (req) => {
