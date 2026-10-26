@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { planHas } from '../_shared/plan.ts'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
+import { findCustomersByPhone } from '../_shared/customerLookup.ts'
 
 // Musteri adi/telefonu gibi bilgiler sohbetin BASINDA verilip randevu cok
 // sonra istenirse, dar bir limit bu bilgiyi baglam penceresinden dusurup
@@ -42,18 +43,19 @@ export async function handler(req: Request): Promise<Response> {
   const { customer_phone } = body
   if (!customer_phone) return json({ error: 'customer_phone zorunlu' }, 400)
 
-  const [{ data: services }, { data: customer }, { data: historyRows }, { data: profiles }] = await Promise.all([
+  const [{ data: services }, customers, { data: historyRows }, { data: profiles }] = await Promise.all([
     admin
       .from('services')
       .select('id, name, price, duration_minutes, description')
       .eq('business_id', business.id)
       .eq('is_active', true),
-    admin
-      .from('customers')
-      .select('id, full_name, contact_phone, bot_paused_until')
-      .eq('business_id', business.id)
-      .eq('phone', customer_phone)
-      .maybeSingle(),
+    // uygulamada "0532..." diye kayitli musteri WhatsApp'tan "90532..." yazar
+    findCustomersByPhone<{ id: string; full_name: string; contact_phone: string | null; bot_paused_until: string | null }>(
+      admin,
+      business.id,
+      customer_phone,
+      'id, full_name, contact_phone, bot_paused_until',
+    ),
     admin
       .from('chatbot_messages')
       .select('role, content, created_at')
@@ -68,6 +70,7 @@ export async function handler(req: Request): Promise<Response> {
   // telefondaki WhatsApp Business'tan) bot icin isletmenin cevabidir; dil
   // modeli yalnizca user/assistant tanir.
   const history = (historyRows ?? []).map((h) => (h.role === 'staff' ? { ...h, role: 'assistant' } : h))
+  const customer = customers.primary
 
   const serviceNameById = new Map((services ?? []).map((s) => [s.id, s.name]))
   const profileIds = (profiles ?? []).map((p) => p.id)
@@ -330,7 +333,8 @@ export async function handler(req: Request): Promise<Response> {
       .from('appointments')
       .select('id, scheduled_at, service_id, employee_id')
       .eq('business_id', business.id)
-      .eq('customer_id', customer.id)
+      // ayni numaranin eskiden acilmis ikinci kaydindaki randevular da
+      .in('customer_id', customers.ids)
       .in('status', ['bekliyor', 'onaylandi'])
       .gt('scheduled_at', new Date().toISOString())
       .order('scheduled_at', { ascending: true })
@@ -365,7 +369,7 @@ export async function handler(req: Request): Promise<Response> {
   // devraldiginda bot ayni numaraya cevap yetistirmeye calisip ust uste
   // binen/celisen mesaj uretmesin diye n8n bu alani kontrol edip suresi
   // dolmamissa bot akisini (OpenAI/randevu/loglama) atlar.
-  const botPaused = !!customer?.bot_paused_until && new Date(customer.bot_paused_until).getTime() > Date.now()
+  const botPaused = customers.all.some((c) => !!c.bot_paused_until && new Date(c.bot_paused_until).getTime() > Date.now())
 
   return json(
     {

@@ -3,6 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
+import { findCustomersByPhone } from '../_shared/customerLookup.ts'
 
 // Musteri/chatbot'un var olan bir randevuyu iptal etmesini saglayan tek
 // mutasyon noktasi. book-appointment ile AYNI kimlik dogrulama deseni
@@ -33,12 +34,9 @@ export async function handler(req: Request): Promise<Response> {
     return json({ error: 'appointment_id ve customer_phone zorunlu' }, 400)
   }
 
-  const { data: customer } = await admin
-    .from('customers')
-    .select('id')
-    .eq('business_id', business.id)
-    .eq('phone', customer_phone)
-    .maybeSingle()
+  // "0532..." / "90532..." ayni kisi: randevu numaranin herhangi bir kaydinda olabilir
+  const customers = await findCustomersByPhone(admin, business.id, customer_phone, 'id')
+  const customer = customers.primary
   // "yok" ile "sahibi degil" ayni 404 — hangisi oldugunu sizdirmiyoruz.
   if (!customer) return json({ error: 'Randevu bulunamadı' }, 404)
 
@@ -47,7 +45,7 @@ export async function handler(req: Request): Promise<Response> {
     .select('id, status, scheduled_at, service_id, employee_id, source_note')
     .eq('id', appointment_id)
     .eq('business_id', business.id)
-    .eq('customer_id', customer.id)
+    .in('customer_id', customers.ids)
     .maybeSingle()
   if (!appt) return json({ error: 'Randevu bulunamadı' }, 404)
 

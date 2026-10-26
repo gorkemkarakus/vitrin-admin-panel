@@ -3,6 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
+import { findCustomersByPhone } from '../_shared/customerLookup.ts'
 import {
   SLOT_MINUTES,
   toMinutes,
@@ -102,19 +103,15 @@ export async function handler(req: Request): Promise<Response> {
   // olusturulabilir. Musteri, bookWith()'teki AYNI eslemeyle (business_id +
   // phone) bulunur, boylece ayni kisinin farkli gunlerdeki mesru ihtiyaclari
   // (ör. bugun sac, yarin manikur icin randevu almasi) engellenmez.
-  const { data: existingCustomerForCap } = await admin
-    .from('customers')
-    .select('id')
-    .eq('business_id', business.id)
-    .eq('phone', customer_phone)
-    .maybeSingle()
+  // "0532..." / "90532..." ayni kisi: numaranin butun kayitlari sayilir
+  const existingForCap = await findCustomersByPhone(admin, business.id, customer_phone, 'id')
 
-  if (existingCustomerForCap) {
+  if (existingForCap.ids.length) {
     const todayStartIstanbul = new Date(`${istanbulDateString(new Date())}T00:00:00+03:00`)
     const { count: todayCount } = await admin
       .from('appointments')
       .select('id', { count: 'exact', head: true })
-      .eq('customer_id', existingCustomerForCap.id)
+      .in('customer_id', existingForCap.ids)
       .gte('created_at', todayStartIstanbul.toISOString())
     if ((todayCount ?? 0) >= 2) {
       return json({ error: 'Bugün için randevu alma limitine ulaştınız, lütfen yarın tekrar deneyin.' }, 429)
@@ -222,18 +219,19 @@ export async function handler(req: Request): Promise<Response> {
   // ic fonksiyonda TypeScript yukaridaki null kontrollerini unutuyor
   const biz = business
   const svc = service
+  const channelPhone = customer_phone
 
   async function bookWith(employeeId: string, start: Date) {
     // customer_phone kanal kimliği (Instagram'da IGSID, WhatsApp'ta ise zaten
     // gerçek numara olabilir) — müşteriyi eşleştirmek/konuşmayı takip etmek
     // için kullanılır. contact_phone ise botun sohbette sorup aldığı GERÇEK
     // iletişim numarasıdır; bilgilendirme mesajları için bu saklanır.
-    const { data: existingCustomer } = await admin
-      .from('customers')
-      .select('id, full_name, contact_phone')
-      .eq('business_id', biz.id)
-      .eq('phone', customer_phone)
-      .maybeSingle()
+    // uygulamada "0532..." diye kayitli musteri bulunur, ikinci kayit acilmaz
+    const { primary: existingCustomer } = await findCustomersByPhone<{
+      id: string
+      full_name: string | null
+      contact_phone: string | null
+    }>(admin, biz.id, channelPhone, 'id, full_name, contact_phone')
 
     let customerId = existingCustomer?.id
     if (!customerId) {

@@ -239,23 +239,7 @@ async function handleEchoes(admin: SupabaseClient, req: Request, value: WhatsApp
       continue
     }
 
-    const until = new Date(Date.now() + ECHO_PAUSE_HOURS * 3600000).toISOString()
-    const { data: customer } = await admin
-      .from('customers')
-      .select('id, bot_paused_until')
-      .eq('business_id', business.id)
-      .eq('phone', customerPhone)
-      .maybeSingle()
-    if (customer) {
-      if (!customer.bot_paused_until || customer.bot_paused_until < until) {
-        await admin.from('customers').update({ bot_paused_until: until }).eq('id', customer.id)
-      }
-    } else {
-      const { error: insErr } = await admin
-        .from('customers')
-        .insert({ business_id: business.id, phone: customerPhone, full_name: 'Müşteri', bot_paused_until: until })
-      if (insErr) console.error('whatsapp-webhook: echo müşterisi oluşturulamadı:', insErr.message)
-    }
+    await pauseBotForCustomer(admin, business.id, customerPhone, ECHO_PAUSE_HOURS)
 
     if (echo.type === 'text' && echo.text?.body) {
       const { error: logErr } = await admin.from('chatbot_messages').insert({

@@ -5,6 +5,7 @@ import { assert, assertEquals } from 'jsr:@std/assert@1'
 import { askForSurname, askTodayOrNextWeek, askWhichCancel, bookingInsteadOfCancel, confirmHypotheticalReschedule, lateNotice, earlyHourQuestionText, fixEchoedTypos, looksLikeEnglish, lowercaseServiceNames, mediaReply, misreadCustomerName, runChatbot, stripEmoji, vagueCancelQuestion, confirmOwnAction, wantsHandover, type ChatbotInput } from './chatbot.ts'
 import { botNamedDate, isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
+import { phoneVariants } from './customerLookup.ts'
 
 const BASE = 'https://ornek.supabase.co'
 const input: ChatbotInput = {
@@ -924,4 +925,13 @@ Deno.test('az onceki ✅ islemini inkar eden cevap yerine islem dogrulanir', () 
   assertEquals(confirmOwnAction(chat('Kusura bakmayın, iptal durumunu buradan doğrulayamıyorum.'), ctx), 'Evet, randevunuz iptal edildi.')
   assertEquals(confirmOwnAction(chat('Evet, randevunuz iptal edildi.'), ctx), null)
   assertEquals(confirmOwnAction(chat('Emin değilim.'), { history: [{ role: 'assistant', content: 'Merhaba' }] }), null)
+})
+
+Deno.test('musteri numarasi butun yazilislariyla aranir (uygulamada 0532, WhatsApp 90532)', () => {
+  const all = ['905321234567', '05321234567', '5321234567', '+905321234567']
+  for (const p of all) assertEquals(new Set(phoneVariants(p)), new Set([p, ...all]))
+  // Instagram, WhatsApp kullanici kimligi ve yabanci numara oldugu gibi
+  assertEquals(phoneVariants('ig:17841400000000000'), ['ig:17841400000000000'])
+  assertEquals(phoneVariants('TR.1824962542022888'), ['TR.1824962542022888'])
+  assertEquals(phoneVariants('79991234567'), ['79991234567'])
 })

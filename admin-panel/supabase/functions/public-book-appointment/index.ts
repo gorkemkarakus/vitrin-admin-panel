@@ -4,6 +4,7 @@ import { sha256Hex } from '../_shared/crypto.ts'
 import { SLOT_MINUTES, isAvailable, rankEligibleByFairness } from '../_shared/availability.ts'
 import { isValidTurkishPhone, validateScheduledAt } from '../_shared/validation.ts'
 import { verifyTurnstile } from '../_shared/turnstile.ts'
+import { findCustomersByPhone } from '../_shared/customerLookup.ts'
 
 const PHONE_RATE_LIMIT_MAX_PER_HOUR = 5
 const IP_RATE_LIMIT_MAX_PER_HOUR = 10
@@ -175,12 +176,12 @@ Deno.serve(async (req) => {
     // numarayla daha önce başka kanaldan (chatbot) gelen müşteriyle aynı
     // customers kaydına düşmesini sağlıyoruz (set-once birleştirme, aynı
     // book-appointment'taki mantık).
-    const { data: existingCustomer } = await admin
-      .from('customers')
-      .select('id, full_name, contact_phone')
-      .eq('business_id', business.id)
-      .eq('phone', customer_phone)
-      .maybeSingle()
+    // "0532..." yazan kisi WhatsApp'tan "90532..." olarak kayitliysa da bulunur
+    const { primary: existingCustomer } = await findCustomersByPhone<{
+      id: string
+      full_name: string | null
+      contact_phone: string | null
+    }>(admin, business.id, customer_phone, 'id, full_name, contact_phone')
 
     let customerId = existingCustomer?.id
     if (!customerId) {
@@ -204,8 +205,8 @@ Deno.serve(async (req) => {
         updates.marketing_consent = true
         updates.marketing_consent_source = 'online_booking'
       }
-      if (!existingCustomer.contact_phone) updates.contact_phone = customer_phone
-      if (!existingCustomer.full_name || existingCustomer.full_name === 'Müşteri') {
+      if (!existingCustomer!.contact_phone) updates.contact_phone = customer_phone
+      if (!existingCustomer!.full_name || existingCustomer!.full_name === 'Müşteri') {
         updates.full_name = customer_name
       }
       if (Object.keys(updates).length > 0) {

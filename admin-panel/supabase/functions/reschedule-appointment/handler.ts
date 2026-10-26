@@ -3,6 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { resolveBusiness } from '../_shared/resolveBusiness.ts'
+import { findCustomersByPhone } from '../_shared/customerLookup.ts'
 import { validateScheduledAt } from '../_shared/validation.ts'
 import { SLOT_MINUTES, isAvailable, eligibleDayHours, istanbulParts, toMinutes, findNextAvailable } from '../_shared/availability.ts'
 import { findClosedDay } from '../_shared/holidays.ts'
@@ -57,12 +58,9 @@ export async function handler(req: Request): Promise<Response> {
   const scheduledAtError = validateScheduledAt(new_scheduled_at)
   if (scheduledAtError) return json({ error: scheduledAtError }, 400)
 
-  const { data: customer } = await admin
-    .from('customers')
-    .select('id')
-    .eq('business_id', business.id)
-    .eq('phone', customer_phone)
-    .maybeSingle()
+  // "0532..." / "90532..." ayni kisi: randevu numaranin herhangi bir kaydinda olabilir
+  const customers = await findCustomersByPhone(admin, business.id, customer_phone, 'id')
+  const customer = customers.primary
   if (!customer) return json({ error: 'Randevu bulunamadı' }, 404)
 
   const { data: appt } = await admin
@@ -70,7 +68,7 @@ export async function handler(req: Request): Promise<Response> {
     .select('id, status, employee_id, service_id, duration_minutes, source_note')
     .eq('id', appointment_id)
     .eq('business_id', business.id)
-    .eq('customer_id', customer.id)
+    .in('customer_id', customers.ids)
     .maybeSingle()
   if (!appt) return json({ error: 'Randevu bulunamadı' }, 404)
 

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendWhatsAppText } from '../_shared/notify.ts'
+import { pauseBotForCustomer } from '../_shared/botPause.ts'
 import {
   igRecipientId,
   instagramConnection,
@@ -99,24 +100,15 @@ Deno.serve(async (req) => {
   // Instagram bu mesajin kopyasini da yollar; salonun telefondan yazdigi sanilmasin.
   if (instagram) await recordInstagramSent(admin, sent.messageId)
 
-  const until = new Date(Date.now() + PAUSE_MS).toISOString()
-  const [{ data: row, error: logErr }, { data: customer }] = await Promise.all([
+  const [{ data: row, error: logErr }] = await Promise.all([
     admin
       .from('chatbot_messages')
       .insert({ business_id: businessId, customer_phone: phone, role: 'staff', content: message })
       .select('role, content, customer_phone, created_at')
       .single(),
-    admin
-      .from('customers')
-      .select('id, bot_paused_until')
-      .eq('business_id', businessId)
-      .eq('phone', phone)
-      .maybeSingle(),
+    pauseBotForCustomer(admin, businessId, phone, PAUSE_MS / 3600000),
   ])
   if (logErr) console.error('send-chat-message: mesaj kaydedilemedi:', logErr.message)
-  if (customer && (!customer.bot_paused_until || customer.bot_paused_until < until)) {
-    await admin.from('customers').update({ bot_paused_until: until }).eq('id', customer.id)
-  }
 
   return json(
     { data: row ?? { role: 'staff', content: message, customer_phone: phone, created_at: new Date().toISOString() } },
