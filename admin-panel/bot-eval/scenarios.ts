@@ -19,6 +19,8 @@ interface Scenario {
   busy?: { employee: string; at: string; minutes: number }[]
   // bu musterinin onceden alinmis randevulari (iptal/degisiklik senaryolari)
   mine?: { service: string; employee: string; at: string }[]
+  // duzenli musteri: son ziyareti (kac gun once) ve kayitli adi/telefonu
+  last?: { service: string; employee: string | null; daysAgo: number }
   check: (c: Ctx) => string[]
 }
 
@@ -266,6 +268,42 @@ export const SCENARIOS: Scenario[] = [
       ...never(c.allBot, /arası açığız/i, `çelişkili "arası açığız": "${c.allBot}"`),
       ...none(c),
     ],
+  },
+  // duzenli musteri: hizmet ve calisan soylemeyince son ziyareti onerilir
+  {
+    id: 'LV01',
+    title: 'duzenli musteri: son ziyareti onerir',
+    last: { service: 'Saç kesimi', employee: 'Büşra Aydın', daysAgo: 30 },
+    messages: ['merhaba randevu almak istiyorum'],
+    check: (c) => [...says(c.allBot, /saç kesimi/i, 'son hizmet önerisi'), ...says(c.allBot, /Büşra/, 'son çalışan önerisi'), ...none(c)],
+  },
+  {
+    id: 'LV02',
+    title: 'oneri kabul: ayni calisana randevu',
+    last: { service: 'Saç kesimi', employee: 'Büşra Aydın', daysAgo: 30 },
+    messages: ['randevu almak istiyorum', 'evet yarın 15:00 olsun'],
+    check: (c) => booked(c, `${TOMORROW}T15:00`, 'Saç kesimi', 'Büşra Aydın'),
+  },
+  {
+    id: 'LV03',
+    title: 'hizmeti kendisi soyler: oneri yok',
+    last: { service: 'Saç kesimi', employee: 'Büşra Aydın', daysAgo: 30 },
+    messages: ['yarın 14:00 manikür'],
+    check: (c) => [...never(c.allBot, /geçen sefer/i, 'gereksiz son ziyaret önerisi'), ...booked(c, `${TOMORROW}T14:00`, 'Manikür')],
+  },
+  {
+    id: 'LV04',
+    title: 'oneri reddedilir: baska hizmet',
+    last: { service: 'Saç kesimi', employee: 'Büşra Aydın', daysAgo: 30 },
+    messages: ['randevu almak istiyorum', 'hayır bu sefer boya', 'yarın 11:00'],
+    check: (c) => booked(c, `${TOMORROW}T11:00`, 'Boya'),
+  },
+  {
+    id: 'LV05',
+    title: 'fiyat sorusu: oneri yok',
+    last: { service: 'Saç kesimi', employee: 'Büşra Aydın', daysAgo: 30 },
+    messages: ['fön ne kadar'],
+    check: (c) => [...says(c.allBot, /250/, 'fön fiyatı'), ...never(c.allBot, /geçen sefer/i, 'gereksiz son ziyaret önerisi')],
   },
   {
     id: 'T03',
@@ -1357,6 +1395,8 @@ export const SCENARIOS: Scenario[] = [
     check: (c) => [
       ...never(c.booked.map((b) => b.at).join(), new RegExp(SUNDAY), 'pazara taşıdı'),
       ...says(c.allBot, /kapalı|pazar/i, 'pazar kapalı bilgisi'),
+      // erkene almak isteyene mevcut randevusunun gunu onerilmez
+      ...never(c.allBot, new RegExp(`${spoken(MONDAY)}[^.?]*(olur|uygun) mu`, 'i'), `mevcut randevu gününü önerdi: "${c.allBot}"`),
     ],
   },
   {

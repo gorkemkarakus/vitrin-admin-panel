@@ -16,6 +16,8 @@ const HISTORY_LIMIT = 60
 // yeni talebi karistirmasin. Musterinin adi/telefonu customers kaydinda
 // kaldigi icin ertesi gun tekrar sorulmaz.
 const HISTORY_WINDOW_HOURS = 24
+// Bundan eski ziyaret "geçen sefer" diye onerilmez (musterinin tercihi degismis olabilir).
+const LAST_VISIT_DAYS = 180
 
 export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -327,23 +329,51 @@ export async function handler(req: Request): Promise<Response> {
   // Turkce bicimlendirme burada YAPILMIYOR (services/working_hours'daki
   // aynı kural: ham veri edge function'dan, Turkce metin n8n'den).
   let appointments: { id: string; service_name: string | null; employee_name: string | null; scheduled_at: string }[] = []
+  // Son ziyaret (son 6 ay): hizmet ve calisan soylemeyen musteriye bot "Geçen
+  // sefer Büşra Hanım'la saç kesimi yaptırmıştınız, yine öyle mi olsun?" der;
+  // duzenli musteri, o saatte bos olan herhangi birine degil kendi calisanina gider.
+  let lastVisit: { service_name: string; employee_name: string | null; scheduled_at: string } | null = null
   if (customer) {
     const profileNameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]))
-    const { data: upcoming } = await admin
-      .from('appointments')
-      .select('id, scheduled_at, service_id, employee_id')
-      .eq('business_id', business.id)
-      // ayni numaranin eskiden acilmis ikinci kaydindaki randevular da
-      .in('customer_id', customers.ids)
-      .in('status', ['bekliyor', 'onaylandi'])
-      .gt('scheduled_at', new Date().toISOString())
-      .order('scheduled_at', { ascending: true })
+    const nowIso = new Date().toISOString()
+    const [{ data: upcoming }, { data: past }] = await Promise.all([
+      admin
+        .from('appointments')
+        .select('id, scheduled_at, service_id, employee_id')
+        .eq('business_id', business.id)
+        // ayni numaranin eskiden acilmis ikinci kaydindaki randevular da
+        .in('customer_id', customers.ids)
+        .in('status', ['bekliyor', 'onaylandi'])
+        .gt('scheduled_at', nowIso)
+        .order('scheduled_at', { ascending: true }),
+      admin
+        .from('appointments')
+        .select('scheduled_at, service_id, employee_id')
+        .eq('business_id', business.id)
+        .in('customer_id', customers.ids)
+        // iptal ve gelmedi sayilmaz
+        .in('status', ['tamamlandi', 'onaylandi', 'bekliyor'])
+        .lt('scheduled_at', nowIso)
+        .gte('scheduled_at', new Date(Date.now() - LAST_VISIT_DAYS * 86400000).toISOString())
+        .order('scheduled_at', { ascending: false })
+        .limit(1),
+    ])
     appointments = (upcoming ?? []).map((a) => ({
       id: a.id,
       service_name: a.service_id ? (serviceNameById.get(a.service_id) ?? null) : null,
       employee_name: a.employee_id ? (profileNameById.get(a.employee_id) ?? null) : null,
       scheduled_at: a.scheduled_at,
     }))
+    const last = past?.[0]
+    // hizmet artik sunulmuyorsa onerilmez; calisan ayrildiysa yalniz hizmet onerilir
+    const lastService = last?.service_id ? serviceNameById.get(last.service_id) : undefined
+    if (last && lastService) {
+      lastVisit = {
+        service_name: lastService,
+        employee_name: last.employee_id ? (profileNameById.get(last.employee_id) ?? null) : null,
+        scheduled_at: last.scheduled_at,
+      }
+    }
   }
 
   // Salonun telefonu (aydinlatma metni ayarindaki iletisim telefonu) ve
@@ -395,6 +425,7 @@ export async function handler(req: Request): Promise<Response> {
         eve_closes_at: h.eve_closes_at ? String(h.eve_closes_at).slice(0, 5) : null,
       })),
       appointments,
+      last_visit: lastVisit,
       history: (history ?? []).reverse().map((h) => ({ role: h.role, content: h.content })),
     },
     200,

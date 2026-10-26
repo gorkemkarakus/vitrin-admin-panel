@@ -110,8 +110,22 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
           closed_days: [{ name: HOLIDAY.name, start_date: HOLIDAY.date, end_date: HOLIDAY.date, eve_closes_at: '13:00' }],
           appointments: salon.customerAppointments(phone),
           history: history.slice(-30),
-          // gercek chatbot-context gibi: onceki mesajlardaki telefon ve 'adım X' hatirlanir
-          ...detected(history),
+          // gercek chatbot-context gibi: onceki mesajlardaki telefon ve 'adım X'
+          // hatirlanir; duzenli musterinin adi/telefonu zaten kayitli
+          ...(() => {
+            const d = detected(history)
+            return {
+              detected_full_name: d.detected_full_name ?? (sc.last ? 'Ayşe Kara' : null),
+              detected_contact_phone: d.detected_contact_phone ?? (sc.last ? '05321230400' : null),
+            }
+          })(),
+          last_visit: sc.last
+            ? {
+                service_name: sc.last.service,
+                employee_name: sc.last.employee,
+                scheduled_at: new Date(Date.now() - sc.last.daysAgo * 86400000).toISOString(),
+              }
+            : null,
         })
       case 'book-appointment':
         return ok(salon.book(body))
