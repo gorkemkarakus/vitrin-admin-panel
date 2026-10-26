@@ -2,8 +2,8 @@
 // ve veritabanina gercek istek gitmez). Calistir:
 //   deno test supabase/functions/_shared/chatbot.test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
-import { askForSurname, askWhichCancel, bookingInsteadOfCancel, confirmHypotheticalReschedule, lateNotice, earlyHourQuestionText, fixEchoedTypos, misreadCustomerName, runChatbot, type ChatbotInput } from './chatbot.ts'
-import { isConfirmationMessage } from './chatbotFlow.js'
+import { askForSurname, askTodayOrNextWeek, askWhichCancel, bookingInsteadOfCancel, confirmHypotheticalReschedule, lateNotice, earlyHourQuestionText, fixEchoedTypos, looksLikeEnglish, lowercaseServiceNames, misreadCustomerName, runChatbot, stripEmoji, vagueCancelQuestion, confirmOwnAction, type ChatbotInput } from './chatbot.ts'
+import { botNamedDate, isConfirmationMessage } from './chatbotFlow.js'
 import { isBusinessScopedUserId } from './notify.ts'
 
 const BASE = 'https://ornek.supabase.co'
@@ -156,7 +156,7 @@ Deno.test('randevu alma: book-appointment cagrilir, onay mesaji doner', async ()
   assertEquals(book.body.scheduled_at, '2026-11-03T14:00:00+03:00')
   assertEquals(book.body.source_note, 'WhatsApp asistanı')
   assertEquals(book.headers['x-bot-secret'], 'gizli')
-  assert(r.reply.startsWith('Randevunuz oluşturuldu ✅\nFön - 3 Kasım 14:00 - Elif Yılmaz'), r.reply)
+  assert(r.reply.startsWith('Randevunuz oluşturuldu ✅\nFön - 3 Kasım Salı 14:00 - Elif Yılmaz'), r.reply)
 })
 
 Deno.test('randevu iptali: cancel-appointment cagrilir', async () => {
@@ -185,7 +185,7 @@ Deno.test('randevu iptali: cancel-appointment cagrilir', async () => {
     customer_phone: input.from,
     phone_number_id: 'pn-1',
   })
-  assertEquals(r.reply, 'Randevunuz iptal edildi ✅\nFön - 23 Ekim 14:00 - Elif Yılmaz')
+  assertEquals(r.reply, 'Randevunuz iptal edildi ✅\nFön - 23 Ekim Cuma 14:00 - Elif Yılmaz')
 })
 
 Deno.test('ikisini de iptal: her iptal cagrisi islenir, bos book_appointment yok sayilir', async () => {
@@ -221,7 +221,7 @@ Deno.test('ikisini de iptal: her iptal cagrisi islenir, bos book_appointment yok
     ['apt-1', 'apt-2'],
   )
   assert(!calls.some((c) => c.url.endsWith('book-appointment')))
-  assertEquals(r.reply, 'Randevularınız iptal edildi ✅\nFön - 23 Ekim 14:00 - Elif Yılmaz\nFön - 23 Ekim 14:00 - Elif Yılmaz')
+  assertEquals(r.reply, 'Randevularınız iptal edildi ✅\nFön - 23 Ekim Cuma 14:00 - Elif Yılmaz\nFön - 23 Ekim Cuma 14:00 - Elif Yılmaz')
 })
 
 Deno.test('saat degisikligi: reschedule-appointment cagrilir', async () => {
@@ -248,7 +248,7 @@ Deno.test('saat degisikligi: reschedule-appointment cagrilir', async () => {
   const req = calls.find((c) => c.url.endsWith('reschedule-appointment'))!
   assertEquals(req.body.appointment_id, 'apt-1')
   assertEquals(req.body.new_scheduled_at, '2026-10-24T16:00:00+03:00')
-  assertEquals(r.reply, 'Randevunuz güncellendi ✅\nFön - 24 Ekim 16:00 - Elif Yılmaz')
+  assertEquals(r.reply, 'Randevunuz güncellendi ✅\nFön - 24 Ekim Cumartesi 16:00 - Elif Yılmaz')
 })
 
 Deno.test('az once alinmis randevuya "evet": tekrar randevu acilmaz', async () => {
@@ -691,7 +691,7 @@ Deno.test('iki hizmet iki saat: model saatle eslestirdigi hizmeti korur, ikinci 
   assertEquals(calls.find((c) => c.url.endsWith('book-appointment'))!.body.service_name, 'Manikür')
   assertEquals(
     r.reply,
-    'Randevunuz oluşturuldu ✅\nManikür - 3 Kasım 10:00 - Elif Yılmaz\n\nBir seferde bir randevu alabiliyorum; diğer randevunun bilgilerini ayrıca yazarsanız onu da hemen ayarlayayım.',
+    'Randevunuz oluşturuldu ✅\nManikür - 3 Kasım Salı 10:00 - Elif Yılmaz\n\nBir seferde bir randevu alabiliyorum; diğer randevunun bilgilerini ayrıca yazarsanız onu da hemen ayarlayayım.',
   )
 })
 
@@ -736,4 +736,117 @@ Deno.test('OpenAI anlik sunucu hatasi: bir kez yeniden denenir', async () => {
   await r.log
   assertEquals(openaiCalls, 2)
   assertEquals(r.reply, 'Fön 250 TL.')
+})
+
+Deno.test('bot tarihi gun adiyla soylediyse eski gun adi "Bilginize" notu dusurmez', () => {
+  const history = [
+    { role: 'user', content: 'pazar günü olsun' },
+    { role: 'assistant', content: 'Maalesef pazar günleri kapalıyız. 2 Kasım Pazartesi olur mu?' },
+  ]
+  assert(botNamedDate(history, '2026-11-02', 'Pazartesi'))
+  assert(botNamedDate([{ role: 'assistant', content: 'Pazartesi, 2 Kasım uygun mu?' }], '2026-11-02', 'Pazartesi'))
+  // baska tarih, musteri mesaji ya da 12 Kasim eslesmez
+  assert(!botNamedDate(history, '2026-11-09', 'Pazartesi'))
+  assert(!botNamedDate([{ role: 'user', content: '2 Kasım Pazartesi' }], '2026-11-02', 'Pazartesi'))
+  assert(!botNamedDate([{ role: 'assistant', content: '12 Kasım Pazartesi olur mu?' }], '2026-11-02', 'Pazartesi'))
+})
+
+Deno.test('bugunun gun adi ("pazartesi" pazartesi gunu): bugun mu gelecek hafta mi sorulur', () => {
+  const now = new Date(Date.now() + 3 * 3600000)
+  const today = now.toISOString().slice(0, 10)
+  const nextWeek = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10)
+  const day = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi'][now.getUTCDay()]
+  const book = (time: string) => ({ hasToolCall: true, toolName: 'book_appointment', toolArgs: { date: today, time } })
+  const q = askTodayOrNextWeek(book('23:59'), `${day} 23:59 manikür`, { history: [] })
+  assert(q?.startsWith('Bugün mü, yoksa '), String(q))
+  assertEquals(askTodayOrNextWeek(book('23:59'), `bugün ${day} 23:59 manikür`, { history: [] }), null)
+  assertEquals(askTodayOrNextWeek(book('23:59'), `haftaya ${day} 23:59 manikür`, { history: [] }), null)
+  // bot bugunu acikca sordu, musteri onayladi
+  assertEquals(
+    askTodayOrNextWeek(book('23:59'), 'evet', { history: [{ role: 'user', content: `${day} 23:59` }, { role: 'assistant', content: 'Bugün 23:59 uygun mu?' }] }),
+    null,
+  )
+  // saat bugun icin gectiyse sormadan gelecek haftaya
+  const passed = book('00:00')
+  assertEquals(askTodayOrNextWeek(passed, `${day} 00:00 manikür`, { history: [] }), null)
+  assertEquals((passed.toolArgs as { date: string }).date, nextWeek)
+  // baska gun / baska islem
+  assertEquals(askTodayOrNextWeek({ ...book('23:59'), toolArgs: { date: nextWeek, time: '23:59' } }, `${day} 23:59`, { history: [] }), null)
+  assertEquals(askTodayOrNextWeek({ hasToolCall: true, toolName: 'cancel_appointment', toolArgs: {} }, day, { history: [] }), null)
+})
+
+Deno.test('musteri emoji kullanmadiysa sohbet cevabindaki emoji silinir', () => {
+  assertEquals(stripEmoji('Günaydın 🌞', 'günaydın'), 'Günaydın.')
+  assertEquals(stripEmoji('Evet, randevunuz iptal edildi ✅', 'iptal oldu mu'), 'Evet, randevunuz iptal edildi.')
+  assertEquals(stripEmoji('Günaydın 🌞 Size nasıl yardımcı olabilirim?', 'günaydın'), 'Günaydın. Size nasıl yardımcı olabilirim?')
+  assertEquals(stripEmoji('Merhaba! 😊 Size nasıl yardımcı olabilirim?', 'merhaba'), 'Merhaba! Size nasıl yardımcı olabilirim?')
+  assertEquals(stripEmoji('😊', '😊'), '😊')
+  // yalniz emoji kalsaydi bos mesaj gitmesin
+  assertEquals(stripEmoji('😊', 'tamam'), '😊')
+})
+
+Deno.test('cumle ortasindaki hizmet adi kucuk harfe cevrilir', () => {
+  const services = [{ name: 'Fön' }, { name: 'Kalıcı oje' }, { name: 'OPI Manikür' }]
+  assertEquals(lowercaseServiceNames('Yarın 24 Ekim Fön için öğleden sonra 3, yani 15:00 uygun mu?', services), 'Yarın 24 Ekim fön için öğleden sonra 3, yani 15:00 uygun mu?')
+  assertEquals(lowercaseServiceNames('Merhaba, Kalıcı oje 550 TL.', services), 'Merhaba, kalıcı oje 550 TL.')
+  // cumle basi, liste satiri ve buyuk harfli ad degismez
+  assertEquals(lowercaseServiceNames('Fön 250 TL.\nKalıcı oje 550 TL', services), 'Fön 250 TL.\nKalıcı oje 550 TL')
+  assertEquals(lowercaseServiceNames('Randevunuz oluşturuldu ✅\nFön - 3 Kasım Salı 14:00', services), 'Randevunuz oluşturuldu ✅\nFön - 3 Kasım Salı 14:00')
+  assertEquals(lowercaseServiceNames('yarın OPI Manikür', services), 'yarın OPI Manikür')
+})
+
+Deno.test('cevaba karisan ingilizce ic dusunce taninir, Turkce cevap etkilenmez', () => {
+  assert(looksLikeEnglish('Selam, Güzel Salon’a hoş geldiniz. How can I help? Wait Turkish only.'))
+  assert(looksLikeEnglish('Merhaba, Güzel Salon’a hoş geldiniz. How can I help?'))
+  assert(!looksLikeEnglish('Selam, Güzel Salon’a hoş geldiniz. Size nasıl yardımcı olabilirim?'))
+  assert(!looksLikeEnglish('Can Er adına yarın 10:00 manikür için telefon numaranız nedir?'))
+  assertEquals(fixEchoedTypos('Günaydın, Siz nasıl yardımcı olabilirim?'), 'Günaydın, Size nasıl yardımcı olabilirim?')
+})
+
+Deno.test('ingilizce karisan cevap bir kez yeniden sorulur', async () => {
+  let openaiCalls = 0
+  const f = (async (url: string | URL) => {
+    const u = String(url)
+    if (u.includes('api.openai.com')) {
+      openaiCalls++
+      const text = openaiCalls === 1 ? 'Merhaba. How can I help? Wait Turkish only.' : 'Merhaba, size nasıl yardımcı olabilirim?'
+      return new Response(JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text }] }] }), { status: 200 })
+    }
+    if (u.endsWith('chatbot-context')) return new Response(JSON.stringify(context), { status: 200 })
+    if (u.endsWith('staff-whatsapp-webhook')) return new Response(JSON.stringify({ handled: false }), { status: 200 })
+    return new Response('{}', { status: 200 })
+  }) as typeof fetch
+  const r = await runChatbot({ ...input, message: 'slm' }, deps(f))
+  await r.log
+  assertEquals(openaiCalls, 2)
+  assertEquals(r.reply, 'Merhaba, size nasıl yardımcı olabilirim?')
+})
+
+Deno.test('nokta sonrasi kucuk harf buyutulur', () => {
+  assertEquals(fixEchoedTypos('Günaydın, hoş geldiniz. size nasıl yardımcı olabilirim?'), 'Günaydın, hoş geldiniz. Size nasıl yardımcı olabilirim?')
+  assertEquals(fixEchoedTypos('Boya 1.400 TL, 10.00 gibi gelin. işlem 2 saat.'), 'Boya 1.400 TL, 10.00 gibi gelin. İşlem 2 saat.')
+})
+
+Deno.test('iki randevu varken bos iptal cevabi yerine hangisi oldugu sorulur', () => {
+  const ctx = {
+    appointments: [
+      { service_name: 'Manikür', scheduled_at: '2026-11-03T07:00:00Z' },
+      { service_name: 'Pedikür', scheduled_at: '2026-11-05T11:00:00Z' },
+    ],
+  }
+  const chat = (chatReply: string) => ({ hasToolCall: false, chatReply })
+  const q = vagueCancelQuestion(chat('Tam olarak ne yapmamı istersiniz?'), 'randevumu iptal et', ctx)
+  assert(q?.startsWith('Hangi randevunuzu iptal edeyim'), String(q))
+  assertEquals(vagueCancelQuestion(chat('Manikür mü, pedikür mü?'), 'randevumu iptal et', ctx), null)
+  assertEquals(vagueCancelQuestion(chat('Maalesef iptal ücreti bilgim yok.'), 'iptal ücreti var mı', ctx), null)
+  assertEquals(vagueCancelQuestion(chat('Tam olarak ne yapmamı istersiniz?'), 'randevumu iptal et', { appointments: ctx.appointments.slice(0, 1) }), null)
+})
+
+Deno.test('az onceki ✅ islemini inkar eden cevap yerine islem dogrulanir', () => {
+  const ctx = { history: [{ role: 'user', content: 'yarınki randevumu iptal edin' }, { role: 'assistant', content: 'Randevunuz iptal edildi ✅\nManikür - 24 Ekim Cumartesi 10:00' }] }
+  const chat = (chatReply: string) => ({ hasToolCall: false, chatReply })
+  assertEquals(confirmOwnAction(chat('Kusura bakmayın, önceki mesajım iptalin sistemde tamamlandığını doğrulamıyor.'), ctx), 'Evet, randevunuz iptal edildi.')
+  assertEquals(confirmOwnAction(chat('Kusura bakmayın, iptal durumunu buradan doğrulayamıyorum.'), ctx), 'Evet, randevunuz iptal edildi.')
+  assertEquals(confirmOwnAction(chat('Evet, randevunuz iptal edildi.'), ctx), null)
+  assertEquals(confirmOwnAction(chat('Emin değilim.'), { history: [{ role: 'assistant', content: 'Merhaba' }] }), null)
 })

@@ -26,6 +26,18 @@ export function isConfirmationMessage(text) {
   return /(^|[^a-zçğıöşü])(evet|uygun|olur|tamam|onaylıyorum|kabul|peki|olsun|tamamdır|ayarla|al bakalım|alalım)([^a-zçğıöşü]|$)/.test(t);
 }
 
+// Bot bu tarihi gun adiyla zaten yazdi mi ("2 Kasım Pazartesi olur mu?")?
+// Oyleyse musteri dogru gunu biliyor: onceki mesajindaki baska gun adi
+// ("pazar olsun" -> kapali, Pazartesi onerildi -> "olur") onaya
+// "Bilginize, o gün Pazartesi" notu eklemesin (bot testinde goruldu).
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+export function botNamedDate(history, isoDate, weekday) {
+  const d = new Date(isoDate + 'T00:00:00Z');
+  const date = `${d.getUTCDate()} ${MONTHS_TR[d.getUTCMonth()]}`;
+  const re = new RegExp(`(^|[^\\d])${date}\\S* ${weekday}|${weekday},? ${date}`, 'i');
+  return (history || []).some((h) => h.role === 'assistant' && re.test(h.content || ''));
+}
+
 // n8n: "Build OpenAI Request"
 export function buildOpenAIRequest($, $json) {
 const webhookData = $('Webhook').item.json.body;
@@ -107,6 +119,27 @@ const closedDaysList = (context.closed_days || [])
   })
   .join('\n');
 
+// Onumuzdeki 14 gunun acik/kapali takvimi. Kapali gune denk gelen musteriye
+// model "Başka hangi gün gelmek istersiniz?" diye bos soru soruyordu (canli
+// Instagram testi); en yakin acik gunu buradan okuyup onersin, tarihle gun
+// adini da kendisi hesaplamasin. Saat yazilmaz: musaitlik karari backend'in.
+const workingDayNames = new Set((context.working_hours || []).map((h) => h.day));
+const isoOf = (d) => d.toISOString().slice(0, 10);
+const upcomingDaysList = workingDayNames.size
+  ? Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(Date.UTC(istanbul.getUTCFullYear(), istanbul.getUTCMonth(), istanbul.getUTCDate() + i));
+      const iso = isoOf(d);
+      const label = `${d.getUTCDate()} ${monthNamesShort[d.getUTCMonth()]} ${weekdays[d.getUTCDay()]}${i === 0 ? ' (bugün)' : i === 1 ? ' (yarın)' : ''}`;
+      const holiday = (context.closed_days || []).find((h) => iso >= h.start_date && iso <= h.end_date);
+      if (holiday) return `- ${label}: KAPALI, ${holiday.name}`;
+      if (!workingDayNames.has(weekdays[d.getUTCDay()])) return `- ${label}: KAPALI`;
+      const eve = (context.closed_days || []).find(
+        (h) => h.eve_closes_at && isoOf(new Date(Date.parse(h.start_date + 'T00:00:00Z') - 86400000)) === iso,
+      );
+      return `- ${label}: açık${eve ? `, ${eve.name} arifesi, yarım gün` : ''}`;
+    }).join('\n')
+  : '';
+
 // Talimat iki parca: SABIT kurallar (butun salonlar ve gunler icin ayni;
 // OpenAI istek basindaki ayni metni onbellekten okur, girdi ~10 kat ucuz) ve
 // DEGISEN isletme bilgileri (ad, tarih, hizmetler, randevular...). Sabit
@@ -138,7 +171,7 @@ const staticSystemPrompt = `Sen bir işletmenin WhatsApp/Instagram asistanısın
 - İki kelimelik ad soyad (ör. "ece su", "can er") tam addır; soyad isteme.
 - Müşterinin yazım hatalarını cevabında tekrarlama (ör. müşteri "hafaya" yazdıysa sen "haftaya" diye düzgün yaz); her kelimeyi doğru yazımıyla kullan.
 - Selamlaşmada salon adını kullanacaksan "Merhaba, [salon adı]'na hoş geldiniz" gibi kur; "Merhaba, [salon adı]." diye salonu selamlar gibi yazma.
-- Doğal cevap örnekleri: müşteri "randevu lazım" → "Tabii, hangi hizmet için?"; "manikür" → "Hangi gün ve saatte gelmek istersiniz?"; "nasılsınız" → "İyiyim, teşekkür ederim. Size nasıl yardımcı olabilirim?"; "boyam berbat oldu" → "Bunu duyduğumuza üzüldük. Konuyu salonla görüşmek için [salon telefonu] numarasını arayabilirsiniz."; "manikür, yarın" → "Yarın saat kaçta gelmek istersiniz?"; "10 olsun" → "Yarın 10:00 manikür için adınız soyadınız ve telefon numaranız nedir?"; "zeynep kaya" → "Teşekkürler, telefon numaranızı da yazar mısınız?"; "kirpik lifting var mı" → "Maalesef kirpik lifting hizmetimiz yok."; "teşekkürler" → "Rica ederim, görüşmek üzere."
+- Doğal cevap örnekleri: müşteri "randevu lazım" → "Tabii, hangi hizmet için?"; "manikür" → "Hangi gün ve saatte gelmek istersiniz?"; "nasılsınız" → "İyiyim, teşekkür ederim. Size nasıl yardımcı olabilirim?"; "boyam berbat oldu" → "Bunu duyduğumuza üzüldük. Konuyu salonla görüşmek için [salon telefonu] numarasını arayabilirsiniz."; "manikür, yarın" → "Yarın saat kaçta gelmek istersiniz?"; "10 olsun" → "Yarın 10:00 manikür için adınız soyadınız ve telefon numaranız nedir?"; "zeynep kaya" → "Teşekkürler, telefon numaranızı da yazar mısınız?"; "kirpik lifting var mı" → "Maalesef kirpik lifting hizmetimiz yok."; "teşekkürler" → "Rica ederim, görüşmek üzere."; sohbetin başında yalnızca bir telefon numarası → "Teşekkürler, size nasıl yardımcı olabilirim?"; öncesinde bir soru yokken "olur" / "tamam" → "Size nasıl yardımcı olabilirim?"
 Kurallar:
 - Müşteri randevu almak istiyorsa ve hizmet + tarih + saat + tam ad + telefon bilgisi TAMAMSA, book_appointment fonksiyonunu HEMEN çağır. Müşteri bir çalışan tercihi BELİRTMEDİYSE bunu bekleme sebebi yapma, employee_name'i boş bırakıp yine de HEMEN çağır — "çalışan tercihiniz var mı?" diye sormak için asla durma. MÜSAİTLİK KARARI SANA AİT DEĞİL: İŞLETME BİLGİLERİ bölümündeki çalışma saatleri listesini SADECE genel bilgi sorularına (ör. "kaçta açıksınız?") cevap vermek için kullan — randevu taleplerinde ASLA kullanma. İstenen saat listedeki çalışma saatleriyle uyuşmuyor GÖRÜNSE bile (ör. liste 19:00'da kapanıyor yazsa ve müşteri 22:00 istese bile), kendi kendine "bu saat çalışma saatleri dışında, alamıyorum" diyerek ASLA reddetme ve "randevunuzu alıyorum" diye YAZIP fonksiyonu çağırmadan da bırakma — hizmet+tarih+saat+tam ad+telefon TAMAMSA, saat ne kadar sıra dışı/imkansız görünürse görünsün, book_appointment'ı HER ZAMAN HEMEN çağır; müsait olup olmadığına, hangi çalışanın uygun olduğuna ve alternatif önermeye SADECE backend (fonksiyonun kendisi) karar verir, sen değil.
 - AD/TELEFON KURALI — ÖNCE ŞUNU KONTROL ET: İŞLETME BİLGİLERİ bölümünde "Bu müşteri sohbetin daha önceki bir noktasında şu bilgiyi vermiş olabilir" başlıklı bir not VAR MI?
@@ -183,6 +216,7 @@ Kurallar:
 - Müşteri sadece kendi adını veya telefon numarasını düzeltmek isterse (ör. "aslında adım X değil Y", "telefon numaramı yanlış söylemişim"), bunu YUKARIDAKİ İPTAL KURALIYLA KARIŞTIRMA — bu bir iptal/değişiklik talebi DEĞİLDİR. Düzeltmeyi nazikçe kabul et ("Tamam, notumu güncelledim: Y") ve sohbetin geri kalanında düzeltilmiş bilgiyi kullan.
 - Müşteri HENÜZ GERÇEK bir randevusu OLUŞMAMIŞKEN (book_appointment hiç çağrılmadıysa, YA DA çağrıldı ama backend SADECE bir alternatif saat ÖNERDİ ve müşteri bunu henüz onaylamadıysa) "vazgeçtim/iptal edelim/boşver" derse, bunu da YUKARIDAKİ İPTAL KURALIYLA KARIŞTIRMA — ortada iptal edilecek GERÇEK bir randevu yok, bu yüzden müşteriyi işletmeyi aramaya YÖNLENDİRME. Sadece bu talebi bıraktığını kısaca onayla (ör. "Tamam, bu talebi iptal ettim.") ve book_appointment çağırma. AMA müşteri "vazgeçtim" derken AYNI mesajda yeni bir tarih/saat/hizmet bilgisi de veriyorsa (ör. "vazgeçtim, 27 Temmuz Pazartesi olsun"), bu bir İPTAL DEĞİL bir DEĞİŞİKLİK talebidir — eski bilgiyi yok sayıp yeni verilen bilgiyle devam et (eksik bir şey varsa kısaca sor, hepsi tamamsa book_appointment'ı çağır); bu durumda talebi tamamen iptal ettiğini söyleyip durma.
 - Bilgi eksikse (hangi hizmet, hangi gün, hangi saat) fonksiyonu çağırmadan önce kısaca sor.
+- KAPALI GÜN KURALI: Müşteri salonun KAPALI olduğu bir günü isterse (İŞLETME BİLGİLERİ'ndeki "Önümüzdeki 14 gün" listesinde KAPALI yazan gün): "Maalesef" ile o gün kapalı olduğunu söyle ve AYNI mesajda o listeden istenen günden SONRAKİ ilk AÇIK günü tek bir soruyla öner. Örnekler: "Maalesef pazar günleri kapalıyız. 2 Kasım Pazartesi olur mu?"; bayramda "Maalesef 29 Ekim'de Cumhuriyet Bayramı nedeniyle kapalıyız. 30 Ekim Cuma olur mu?"; müşteri saat de söylediyse saati öneriye ekle: "Maalesef pazar günleri kapalıyız. 2 Kasım Pazartesi 15:00 olur mu?". "Hangi gün gelmek istersiniz?", "Başka hangi gün ve saat uygun?", "Başka bir gün tercih eder misiniz?" gibi açık uçlu soru SORMA. Kapalı bir günü ASLA seçenek olarak sunma: müşteri "hafta sonu" derse ve pazar kapalıysa "Cumartesi mi, pazar mı?" diye sorma, "Pazar günleri kapalıyız. 24 Ekim Cumartesi 12:00 olur mu?" gibi açık günü öner. Önerdiğin gün için "boş/müsait" deme. Müşteri öneriyi kabul ederse ("olur", "evet") o günle devam et: eksik kalan bilgiyi sor, bilgiler tamamsa book_appointment'ı çağır. Müşteri öneriyi istemezse o zaman hangi günü istediğini sor. (Hizmet+tarih+saat+tam ad+telefon zaten tamamsa yukarıdaki kural geçerli: book_appointment'ı çağır, en yakın uygun saati sistem önerir.) Bu kural randevu TAŞIMA isteği için de geçerli. Müşterinin istediği gün kapalıysa tarihi ASLA sessizce başka bir güne ya da sonraki haftanın aynı gününe kaydırıp book_appointment / reschedule_appointment çağırma: ya kapalı olduğunu söyleyip öner ya da fonksiyonu müşterinin İSTEDİĞİ tarihle çağır.
 - Müşteri "müsait mi / boş mu / yer var mı / en erken ne zaman" diye sorarsa: müsaitliğe sistem ancak randevu denerken bakabilir. Bunu müşteriye teknik olarak ANLATMA ("randevu talebi oluştururken kontrol edebiliyorum" gibi cümle kurma); hizmet belli değilse önce hizmeti, belliyse hangi gün ve saatte gelmek istediğini sor. Hiçbir saati kendiliğinden "boş/müsait" diye söyleme.
 - "yarın", "pazartesi" gibi göreceli ifadeleri bugünün tarihine göre kesin bir tarihe çevir. "Ayın 31'i", "ayın 5'inde" gibi ifadeler İÇİNDE BULUNDUĞUMUZ ayı kasteder (o gün bu ay geçtiyse gelecek ayı); "hangi ayın?" diye SORMA. Müşterinin zaten açıkça verdiği saat, ad ve telefonu ayrıca "doğru mu?" diye tekrar onaylatma.
 - "GELECEK HAFTA [gün]" ifadesi için ASLA KENDİN HESAPLAMA — aşağıdaki hazır tabloya bak ve doğrudan oradan oku (bu sık yanlış hesaplanan bir ifade türüdür, bu yüzden tablo senin için önceden hazırlandı):
@@ -191,7 +225,7 @@ Kurallar:
 - Müşteri bir tarihi (gün/ay) belirli bir gün adıyla (ör. "4 Ağustos Salı") birlikte söylerse, bu gün adının doğru olup olmadığını ASLA kendin hesaplamaya veya tahmin etmeye çalışma — sadece müşterinin söylediği gün adını stated_weekday alanına birebir aktar, doğruluğunu kontrol etmek sistemin işi. Randevu için her zaman müşterinin verdiği TARİHİ (gün/ay) kullan.
 - Randevu dışı sorularda (fiyat, çalışma saatleri, genel bilgi) doğrudan İŞLETME BİLGİLERİ bölümündeki bilgilerle cevap ver.
 - Emin olmadığın bilgiyi uydurma.
-- Müşteri senin "En yakın uygun saat: ... - ÇalışanAdı" şeklinde önceden verdiğin bir öneriyi onaylıyorsa (ör. "uygun", "olur", "evet"), book_appointment çağırırken o önerideki tarih, saat ve çalışan adını TAM OLARAK BİREBİR kullan — hafızandan yeniden üretme, sohbet geçmişindeki son öneriyi harfiyen kopyala. Müşteri onay kelimesi (uygun/olur/evet/tamam vb.) SÖYLEMEDEN sadece kendi ORİJİNAL (reddedilmiş) saatini AYNEN tekrar ederse, bunu senin önerini kabul ettiği ANLAMINA GELMEZ — bu durumda önerini SESSİZCE kabul edilmiş SAYIP o alternatif saate randevu OLUŞTURMA; bunun yerine önerini tekrar hatırlat ve net bir onay bekle (ör. "Az önce belirttiğiniz saat dolu, önerdiğim [saat] uygun mu?").`;
+- Müşteri senin "En yakın uygun saat: ... - ÇalışanAdı" şeklinde önceden verdiğin bir öneriyi onaylıyorsa (ör. "uygun", "olur", "evet"), book_appointment çağırırken o önerideki tarih, saat ve çalışan adını TAM OLARAK BİREBİR kullan — hafızandan yeniden üretme, sohbet geçmişindeki son öneriyi harfiyen kopyala. Müşteri onay kelimesi (uygun/olur/evet/tamam vb.) SÖYLEMEDEN sadece kendi ORİJİNAL (reddedilmiş) saatini AYNEN tekrar ederse, bunu senin önerini kabul ettiği ANLAMINA GELMEZ — bu durumda önerini SESSİZCE kabul edilmiş SAYIP o alternatif saate randevu OLUŞTURMA; bunun yerine önerini tekrar hatırlat ve net bir onay bekle (ör. "Maalesef 13:00 dolu. En yakın boş saat 24 Ekim 15:00, uygun mu?"; "yer olmadı" gibi devrik ifade ve çalışan adını cümleye eksiz ekleme).`;
 const businessInfoPrompt = `İŞLETME BİLGİLERİ
 İşletmenin adı: ${context.business_name || '(kayıtlı değil)'}
 Bugünün tarihi: ${todayStr} (${weekday}), şu anki saat: ${nowTimeStr}.
@@ -208,6 +242,9 @@ ${hoursList ? 'Bu listede OLMAYAN günler salon KAPALIDIR (ör. listede Pazar yo
 ${closedDaysList ? `
 Salonun KAPALI olduğu günler (bu günlere asla randevu önerme; müşteri bu günlerden birini isterse kapalı olduğunu ve sebebini söyleyip başka gün öner):
 ${closedDaysList}
+` : ''}
+${upcomingDaysList ? `Önümüzdeki 14 gün (yalnızca salonun o gün açık mı kapalı mı olduğunu gösterir, saatlerin boş olduğunu GÖSTERMEZ):
+${upcomingDaysList}
 ` : ''}
 ${salonPhoneLine}
 Salonun fiziksel adresi/konumu sistemde kayıtlı değil — bu soru gelirse bilmediğini söyle, uydurma.
@@ -783,19 +820,27 @@ const mentionsStatedWeekday = toolArgs.stated_weekday && messagesToCheck.some((m
   const words = (m || '').toLowerCase().match(/[a-zçğıöşü]+/g) || [];
   return words.some((w) => fuzzyMatchDay(w) === toolArgs.stated_weekday.toLowerCase());
 });
-const weekdayNote = mentionsStatedWeekday && toolArgs.stated_weekday !== actualWeekday ? actualWeekday : null;
+// gun adi bu mesajda yeniden yazildiysa bot onceden dogru gunu soylemis olsa da not duser
+const statedInThisMessage = ((webhookData.message || '').toLowerCase().match(/[a-zçğıöşü]+/g) || [])
+  .some((w) => fuzzyMatchDay(w) === (toolArgs.stated_weekday || '').toLowerCase());
+const weekdayNote = mentionsStatedWeekday && toolArgs.stated_weekday !== actualWeekday &&
+  (statedInThisMessage || !botNamedDate(contextHistory, finalDate, actualWeekday)) ? actualWeekday : null;
 // "yarın salı" gibi goreceli gun + celisen gun adi: hangisinin kastedildigi
 // belirsiz. Yanlis gune randevu acip not dusmek yerine randevu acilmadan sorulur
 // (yanlis gun riski, bir soru daha sormaktan pahali).
 let weekdayConflict = null;
-if (weekdayNote && /(?<![a-zçğıöşü])(yarın|yarin|bugün|bugun|öbür gün|yarından sonra)(?![a-zçğıöşü])/i.test(webhookData.message || '')) {
+const relativeDay = weekdayNote && (webhookData.message || '').toLocaleLowerCase('tr').match(/(?<![a-zçğıöşü])(yarın|yarin|bugün|bugun|öbür gün|yarından sonra)(?![a-zçğıöşü])/);
+if (relativeDay) {
   const monthsTr = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  // "Yarın 24 Ekim Cumartesi, salı ise 27 Ekim." (eskiden "24 Ekim Cumartesi
+  // günü, salı ise 27 Ekim." yaziyordu, neyin neye denk geldigi anlasilmiyordu)
+  const relativeWord = { yarin: 'Yarın', bugun: 'Bugün' }[relativeDay[1]] || relativeDay[1].charAt(0).toLocaleUpperCase('tr') + relativeDay[1].slice(1);
   const nowIst = new Date(Date.now() + 3 * 3600000);
   const todayUtc = Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate());
   const delta = ((weekdayNames.indexOf(toolArgs.stated_weekday) - nowIst.getUTCDay() + 7) % 7) || 7;
   const statedDate = new Date(todayUtc + delta * 86400000);
   const askedDate = new Date(finalDate + 'T00:00:00Z');
-  weekdayConflict = `${askedDate.getUTCDate()} ${monthsTr[askedDate.getUTCMonth()]} ${actualWeekday} günü, ${toolArgs.stated_weekday.toLocaleLowerCase('tr')} ise ${statedDate.getUTCDate()} ${monthsTr[statedDate.getUTCMonth()]}. Hangi gün olsun?`;
+  weekdayConflict = `${relativeWord} ${askedDate.getUTCDate()} ${monthsTr[askedDate.getUTCMonth()]} ${actualWeekday}, ${toolArgs.stated_weekday.toLocaleLowerCase('tr')} ise ${statedDate.getUTCDate()} ${monthsTr[statedDate.getUTCMonth()]}. Hangi gün olsun?`;
 }
 
 // LLM "ayrıca [baska tarih] icin de [baska hizmet] istiyorum" gibi bir
@@ -1008,12 +1053,15 @@ function fmt(iso) {
   const year = d.getUTCFullYear();
   const yearSuffix = year !== nowIstanbul.getUTCFullYear() ? ' ' + year : '';
   const time = d.toISOString().slice(11, 16);
-  return { display: `${day} ${month}${yearSuffix} ${time}` };
+  // onay kartinda gun adi da yazar ("2 Kasım Pazartesi 14:00"): musteri yanlis
+  // gunu aklinda tutmasin. Oneri satirinda yok, o satiri regex geri okuyor.
+  const weekday = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][d.getUTCDay()];
+  return { display: `${day} ${month}${yearSuffix} ${time}`, withWeekday: `${day} ${month}${yearSuffix} ${weekday} ${time}` };
 }
 
 if (result.status === 'booked') {
-  const { display } = fmt(result.appointment.scheduled_at);
-  reply = `Randevunuz oluşturuldu ✅\n${result.appointment.service_name} - ${display}${result.appointment.employee_name ? ' - ' + result.appointment.employee_name : ''}\nGörüşmek üzere!`;
+  const { withWeekday } = fmt(result.appointment.scheduled_at);
+  reply = `Randevunuz oluşturuldu ✅\n${result.appointment.service_name} - ${withWeekday}${result.appointment.employee_name ? ' - ' + result.appointment.employee_name : ''}\nGörüşmek üzere!`;
 } else if (result.status === 'unavailable') {
   const { display } = fmt(result.suggestion.scheduled_at);
   // book-appointment artik "outside_hours" alaniyla ISTENEN saatin gercekten
@@ -1029,9 +1077,15 @@ if (result.status === 'booked') {
     // onaylayip donguye giriyordu.
     unavailablePrefix = (result.closed_day.eve_closes_at ? `Maalesef o gün ${result.closed_day.name} arifesi nedeniyle saat ${result.closed_day.eve_closes_at} itibarıyla kapanıyoruz.` : `Maalesef o gün${result.closed_day.name ? ' ' + result.closed_day.name + ' nedeniyle' : ''} kapalıyız.`);
   } else if (result.outside_hours) {
-    unavailablePrefix = result.outside_hours.starts_at
-      ? `O gün ${result.outside_hours.starts_at}-${result.outside_hours.ends_at} arası açığız, maalesef o saate randevu veremiyoruz.`
-      : `Maalesef o gün${bookedServiceName ? ' ' + bookedServiceName + ' için' : ''} açık değiliz.`;
+    // Istenen saat acik araliktaysa sebep islemin kapanistan once bitmemesi:
+    // "O gün 09:00-19:00 arası açığız" 18:30 isteyen musteriye celiskili geliyordu.
+    const oh = result.outside_hours;
+    const askedTime = String($('Build Booking Request').item.json.scheduled_at || '').slice(11, 16);
+    unavailablePrefix = !oh.starts_at
+      ? `Maalesef o gün${bookedServiceName ? ' ' + bookedServiceName + ' için' : ''} açık değiliz.`
+      : askedTime >= oh.starts_at && askedTime < oh.ends_at
+        ? `Maalesef o gün kapanışımız ${oh.ends_at}, ${bookedServiceName ? bookedServiceName.toLocaleLowerCase('tr') : 'işlem'} o saate kadar bitmiyor.`
+        : `O gün ${oh.starts_at}-${oh.ends_at} arası açığız, maalesef o saate randevu veremiyoruz.`;
   } else {
     unavailablePrefix = 'Maalesef o saat dolu.';
   }
@@ -1350,7 +1404,8 @@ function fmt(iso) {
   const year = d.getUTCFullYear();
   const yearSuffix = year !== nowIstanbul.getUTCFullYear() ? ' ' + year : '';
   const time = d.toISOString().slice(11, 16);
-  return { display: `${day} ${month}${yearSuffix} ${time}` };
+  const weekday = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][d.getUTCDay()];
+  return { display: `${day} ${month}${yearSuffix} ${weekday} ${time}` };
 }
 let reply;
 if (result.status === 'cancelled') {
@@ -1722,7 +1777,10 @@ const mentionsStatedWeekday = toolArgs.new_stated_weekday && messagesToCheck.som
   const words = (m || '').toLowerCase().match(/[a-zçğıöşü]+/g) || [];
   return words.some((w) => fuzzyMatchDay(w) === toolArgs.new_stated_weekday.toLowerCase());
 });
-const weekdayNote = mentionsStatedWeekday && toolArgs.new_stated_weekday !== actualWeekday ? actualWeekday : null;
+const statedInThisMessage = ((webhookData.message || '').toLowerCase().match(/[a-zçğıöşü]+/g) || [])
+  .some((w) => fuzzyMatchDay(w) === (toolArgs.new_stated_weekday || '').toLowerCase());
+const weekdayNote = mentionsStatedWeekday && toolArgs.new_stated_weekday !== actualWeekday &&
+  (statedInThisMessage || !botNamedDate(contextHistory, finalDate, actualWeekday)) ? actualWeekday : null;
 
 return [{
   json: {
@@ -1750,12 +1808,14 @@ function fmt(iso) {
   const year = d.getUTCFullYear();
   const yearSuffix = year !== nowIstanbul.getUTCFullYear() ? ' ' + year : '';
   const time = d.toISOString().slice(11, 16);
-  return { display: `${day} ${month}${yearSuffix} ${time}` };
+  // onay kartinda gun adi da yazar; oneri satirinda yok (regex geri okuyor)
+  const weekday = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][d.getUTCDay()];
+  return { display: `${day} ${month}${yearSuffix} ${time}`, withWeekday: `${day} ${month}${yearSuffix} ${weekday} ${time}` };
 }
 let reply;
 if (result.status === 'rescheduled') {
-  const { display } = fmt(result.appointment.scheduled_at);
-  reply = `Randevunuz güncellendi ✅\n${result.appointment.service_name || 'Hizmet'} - ${display}${result.appointment.employee_name ? ' - ' + result.appointment.employee_name : ''}`;
+  const { withWeekday } = fmt(result.appointment.scheduled_at);
+  reply = `Randevunuz güncellendi ✅\n${result.appointment.service_name || 'Hizmet'} - ${withWeekday}${result.appointment.employee_name ? ' - ' + result.appointment.employee_name : ''}`;
 } else if (result.status === 'unavailable') {
   const { display } = fmt(result.suggestion.scheduled_at);
   const who = result.suggestion.employee_name ? ' - ' + result.suggestion.employee_name : '';
@@ -1765,7 +1825,14 @@ if (result.status === 'rescheduled') {
   const why = result.closed_day
     ? (result.closed_day.eve_closes_at ? `Maalesef o gün ${result.closed_day.name} arifesi nedeniyle saat ${result.closed_day.eve_closes_at} itibarıyla kapanıyoruz.` : `Maalesef o gün${result.closed_day.name ? ' ' + result.closed_day.name + ' nedeniyle' : ''} kapalıyız.`)
     : result.outside_hours && result.outside_hours.starts_at
-      ? `O gün ${result.outside_hours.starts_at}-${result.outside_hours.ends_at} arası açığız.`
+      ? (() => {
+          // saat acik araliktaysa sebep islemin kapanistan once bitmemesi
+          const oh = result.outside_hours;
+          const askedTime = String($('Build Reschedule Request').item.json.new_scheduled_at || '').slice(11, 16);
+          return askedTime >= oh.starts_at && askedTime < oh.ends_at
+            ? `Maalesef o gün kapanışımız ${oh.ends_at}, randevunuz o saate kadar bitmiyor.`
+            : `O gün ${oh.starts_at}-${oh.ends_at} arası açığız.`;
+        })()
       : 'Maalesef o saat dolu.';
   reply = `${why} Randevunuzu taşımak için en yakın uygun saat: ${display}${who}. Uygun mu?`;
 } else if (result.status === 'no_availability') {

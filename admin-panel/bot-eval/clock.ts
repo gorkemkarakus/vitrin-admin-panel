@@ -1,10 +1,11 @@
-// Senaryolar hafta ici icin yazildi ("yarın" acik gun). Hafta sonu
-// calistirilinca saat bir onceki cumaya kaydirilir (pazartesi/persembe
-// denendi: "pazartesi" bugune, "bir hafta sonra" tatile denk geliyordu); bot,
-// sahte salon ve senaryolar ayni kaydirilmis saati gorur. run.ts'te ILK import olmali.
+// Senaryolar hafta ici icin yazildi ("yarın" acik gun). Hafta sonu ve
+// pazartesi calistirilinca saat bir onceki cumaya kaydirilir (pazartesi/persembe
+// denendi: "pazartesi" bugune, "bir hafta sonra" tatile denk geliyordu; pazartesi
+// gunu de "pazartesi" bugun sayiliyordu); bot, sahte salon ve senaryolar ayni
+// kaydirilmis saati gorur. run.ts'te ILK import olmali.
 const RealDate = Date
 const istDay = new RealDate(RealDate.now() + 3 * 3600000).getUTCDay()
-const SHIFT_DAYS = istDay === 6 ? 1 : istDay === 0 ? 2 : 0
+const SHIFT_DAYS = istDay === 6 ? 1 : istDay === 0 ? 2 : istDay === 1 ? 3 : 0
 const SHIFT = SHIFT_DAYS * 86400000
 
 if (SHIFT) {
@@ -18,5 +19,5 @@ if (SHIFT) {
     }
   }
   globalThis.Date = ShiftedDate as DateConstructor
-  console.log(`hafta sonu: saat ${SHIFT_DAYS} gun geri (cuma) kaydirildi`)
+  console.log(`saat ${SHIFT_DAYS} gun geri (cuma) kaydirildi`)
 }

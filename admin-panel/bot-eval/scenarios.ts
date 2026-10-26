@@ -43,7 +43,15 @@ const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz'
 const TOMORROW = plus(1)
 const MONDAY = nextDow(1)
 const SUNDAY = nextDow(0)
-const at = (date: string, hhmm: string) => `${date}T${hhmm}:00+03:00`
+const dayAfter = (date: string) => ymd(new Date(Date.parse(date + 'T00:00:00Z') + 86400000))
+// "1 kasım" gibi musteri yazimi
+const spoken = (date: string) => `${Number(date.slice(8))} ${MONTHS[Number(date.slice(5, 7)) - 1].toLocaleLowerCase('tr')}`
+// kapali gune "hangi gün?" diye bos soru (en yakin acik gun onerilmeli)
+const OPEN_DAY_QUESTION = /hangi (başka )?gün|başka (hangi |bir )?gün|hangi tarih/i
+// bugunun gun adi ("bugün cuma iken 'cuma 18:30'"): bugun mu gelecek hafta mi sorulmali
+const TODAY_NAME = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi'][istToday.getUTCDay()]
+const pastToday = (hhmm: string) => istToday.toISOString().slice(11, 16) >= hhmm
+const at =(date: string, hhmm: string) => `${date}T${hhmm}:00+03:00`
 
 // --- kontrol yardimcilari ---
 const booked = (c: Ctx, when: string, service?: string, employee?: string): string[] => {
@@ -183,6 +191,82 @@ export const SCENARIOS: Scenario[] = [
     messages: ['bu pazar 12de fön olur mu, ece koç 05321117766'],
     check: (c) => [...says(c.allBot, /kapalı|çalışmıyor|açık değil|pazar/i, 'pazar kapalı'), ...never(c.booked.map((b) => b.at).join(), new RegExp(SUNDAY), 'pazara randevu')],
   },
+  // canli Instagram testi: "1 Kasım Pazar kapalıyız. Hangi başka gün ve saatte gelmek istersiniz?"
+  {
+    id: 'KG01',
+    title: 'kapali gune en yakin acik gunu onermeli',
+    messages: ['pedikür yaptırmak istiyorum', `${spoken(SUNDAY)} olsun`],
+    check: (c) => {
+      const r = c.turns[1]?.bot ?? ''
+      return [
+        ...says(r, /kapalı/i, 'kapalı bilgisi'),
+        ...says(r, new RegExp(`pazartesi|${Number(dayAfter(SUNDAY).slice(8))} ${MONTHS[Number(dayAfter(SUNDAY).slice(5, 7)) - 1]}`, 'i'), 'en yakın açık gün (pazartesi) önerisi'),
+        ...never(r, OPEN_DAY_QUESTION, `boş "hangi gün" sorusu: "${r}"`),
+        ...none(c),
+      ]
+    },
+  },
+  {
+    id: 'KG02',
+    title: 'kapali gun onerisi kabul edilince randevu',
+    messages: ['pedikür yaptırmak istiyorum', 'pazar günü olsun', 'olur', '14', 'ayşe kara 05321230201'],
+    check: (c) => [
+      ...never(c.turns[1]?.bot ?? '', OPEN_DAY_QUESTION, `boş "hangi gün" sorusu: "${c.turns[1]?.bot}"`),
+      ...booked(c, `${dayAfter(SUNDAY)}T14:00`, 'Pedikür'),
+    ],
+  },
+  {
+    id: 'KG03',
+    title: 'bayram gunu, saat yok',
+    messages: [`${spoken(HOLIDAY.date)}de manikür yaptırabilir miyim`],
+    check: (c) => [
+      ...says(c.allBot, /kapalı|bayram/i, 'kapalı/bayram'),
+      ...says(c.allBot, new RegExp(`${Number(dayAfter(HOLIDAY.date).slice(8))} ${MONTHS[Number(dayAfter(HOLIDAY.date).slice(5, 7)) - 1]}|cuma`, 'i'), 'bayramdan sonraki açık gün önerisi'),
+      ...never(c.allBot, OPEN_DAY_QUESTION, `boş "hangi gün" sorusu: "${c.allBot}"`),
+    ],
+  },
+  {
+    id: 'KG04',
+    title: 'kapali gun + saat, ad yok',
+    messages: ['pazar 15:00 kaş alımı olur mu'],
+    check: (c) => [
+      ...says(c.allBot, /kapalı/i, 'kapalı bilgisi'),
+      ...says(c.allBot, /pazartesi/i, 'pazartesi önerisi'),
+      ...never(c.allBot, OPEN_DAY_QUESTION, `boş "hangi gün" sorusu: "${c.allBot}"`),
+    ],
+  },
+  {
+    id: 'BG01',
+    title: 'bugunun gun adi: bugun mu gelecek hafta mi sorulmali',
+    messages: [`${TODAY_NAME} 17:00 manikür, ece su 05321230300`],
+    check: (c) => [
+      ...never(c.booked.map((b) => b.at).join(), new RegExp(`${plus(0)}T`), 'sormadan bugüne randevu'),
+      ...(pastToday('17:00') ? booked(c, `${plus(7)}T17:00`, 'Manikür') : [...says(c.allBot, /bugün/i, '"bugün mü" sorusu'), ...none(c)]),
+    ],
+  },
+  {
+    id: 'BG02',
+    title: 'bugunun gun adi, cevap "gelecek hafta"',
+    messages: [`${TODAY_NAME} 17:00 manikür, ece su 05321230301`, 'gelecek hafta'],
+    check: (c) => booked(c, `${plus(7)}T17:00`, 'Manikür'),
+  },
+  {
+    id: 'BG03',
+    title: 'bugunun gun adi, cevap "bugün"',
+    messages: [`${TODAY_NAME} 17:00 manikür, ece su 05321230302`, 'bugün'],
+    check: (c) => (pastToday('17:00') ? [] : booked(c, `${plus(0)}T17:00`, 'Manikür')),
+  },
+  // 18:30 acik saat; sebep manikurun 19:00 kapanistan once bitmemesi
+  {
+    id: 'KG05',
+    title: 'kapanistan once bitmeyen islem',
+    messages: ['yarın 18:30 manikür, ece su 05321230303'],
+    check: (c) => [
+      ...says(c.allBot, /kapanış|bitmiyor/i, 'kapanıştan önce bitmediği bilgisi'),
+      ...never(c.allBot, /arası açığız/i, `çelişkili "arası açığız": "${c.allBot}"`),
+      ...none(c),
+    ],
+  },
   {
     id: 'T03',
     title: 'haftaya sali',
@@ -242,7 +326,7 @@ export const SCENARIOS: Scenario[] = [
     title: 'dolu -> kendi saatini tekrar eder (onay degil)',
     busy: ELIF_BUSY,
     messages: ['yarın 13:00 pedikür, gamze er 05321110015', '13:00 istiyorum ama'],
-    check: (c) => none(c),
+    check: (c) => [...none(c), ...never(c.turns[1]?.bot ?? '', /\d{2}:\d{2},? [A-ZÇĞİÖŞÜ][a-zçğıöşü]+ [A-ZÇĞİÖŞÜ][a-zçğıöşü]+ uygun mu/, `çalışan adı eksiz sarkıyor: "${c.turns[1]?.bot}"`)],
   },
 
   // ---------------- calisan tercihi ----------------
@@ -506,7 +590,11 @@ export const SCENARIOS: Scenario[] = [
     title: 'yanlis gun adi',
     messages: [`yarın ${['pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma'][new Date(TOMORROW + 'T00:00:00Z').getUTCDay() % 5]} 10:00 manikür, ece su 05321230043`],
     // yarın ile celisen gun adi: yanlis gune acmak yerine hangi gun oldugu sorulur
-    check: (c) => [...none(c), ...says(c.allBot, /hangi gün|hangisi|kastediyorsunuz|mı olsun|mi olsun/i, 'hangi gün sorusu')],
+    check: (c) => [
+      ...none(c),
+      ...says(c.allBot, /hangi gün|hangisi|kastediyorsunuz|mı olsun|mi olsun/i, 'hangi gün sorusu'),
+      ...never(c.allBot, /^\d+ \S+ \S+ günü,/, `anlaşılmayan kalıp: "${c.allBot}"`),
+    ],
   },
 
   // ---------------- tuhaf / kotu niyetli ----------------
@@ -865,7 +953,11 @@ export const SCENARIOS: Scenario[] = [
     id: 'T13',
     title: 'bu hafta sonu',
     messages: ['bu hafta sonu 12:00 fön olur mu, oya su 05321240010'],
-    check: (c) => [...never(c.booked.map((b) => b.at).join(), new RegExp(SUNDAY), 'pazara randevu'), ...ifBooked(c, [`${TOMORROW}T12:00`])],
+    check: (c) => [
+      ...never(c.booked.map((b) => b.at).join(), new RegExp(SUNDAY), 'pazara randevu'),
+      ...ifBooked(c, [`${TOMORROW}T12:00`]),
+      ...never(c.allBot, /pazar m[ıi]/i, `kapalı günü seçenek olarak sundu: "${c.allBot}"`),
+    ],
   },
 
   // ---------------- hizmet adlari ----------------
@@ -1007,7 +1099,7 @@ export const SCENARIOS: Scenario[] = [
     id: 'DS01',
     title: 'once telefon, sonra ad, en son hizmet',
     messages: ['05321260001', 'adım melis can', 'yarın 12de kaş alımı'],
-    check: (c) => booked(c, `${TOMORROW}T12:00`, 'Kaş alımı'),
+    check: (c) => [...booked(c, `${TOMORROW}T12:00`, 'Kaş alımı'), ...never(c.turns[0]?.bot ?? '', /bu numarayla/i, `tuhaf karşılama: "${c.turns[0]?.bot}"`)],
   },
   {
     id: 'DS02',
@@ -1145,7 +1237,8 @@ export const SCENARIOS: Scenario[] = [
     messages: ['hamileyim boya yaptırabilir miyim'],
     check: (c) => [
       ...says(c.allBot, /doktor|hekim/i, 'doktora yönlendirme'),
-      ...never(c.allBot, /zararı yok|güvenli(dir)?|sakınca(sı)? yok|yaptırabilirsiniz/i, 'sağlık tavsiyesi verdi'),
+      // "doktorunuza danışmanız en güvenlisi" tavsiye degil
+      ...never(c.allBot, /zararı yok|güvenli(dir)?(?!si)|sakınca(sı)? yok|yaptırabilirsiniz/i, 'sağlık tavsiyesi verdi'),
     ],
   },
   {
@@ -1174,7 +1267,7 @@ export const SCENARIOS: Scenario[] = [
     id: 'DS23',
     title: 'baglamsiz "olur"',
     messages: ['olur'],
-    check: (c) => [...none(c), ...(c.allBot.length > 120 ? ['uzun cevap'] : [])],
+    check: (c) => [...none(c), ...(c.allBot.length > 120 ? ['uzun cevap'] : []), ...never(c.allBot, /neye olur/i, `kaba cevap: "${c.allBot}"`)],
   },
   {
     id: 'DS24',

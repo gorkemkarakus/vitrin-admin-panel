@@ -124,6 +124,42 @@ export function confirmHypotheticalReschedule(parsed: Json, message: string): st
   return `Randevunuzu ${d.getUTCDate()} ${month[0].toLocaleUpperCase('tr')}${month.slice(1)} ${args.new_time} olarak güncellememi ister misiniz?`
 }
 
+// Bugun pazartesiyken "pazartesi 13.30 fön": model randevuyu bugune aciyordu
+// (bot testinde 16'da 14); cogu musteri gelecek haftayi kastediyor ama bugun
+// de olabilir. Musteri "bugün" ya da tarih demediyse once sorulur. Saat bugun
+// icin gectiyse gelecek hafta kastedilmistir: sormadan oraya alinir.
+const WEEKDAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
+export function askTodayOrNextWeek(parsed: Json, message: string, context: Json): string | null {
+  const reschedule = parsed.toolName === 'reschedule_appointment'
+  if (parsed.toolName !== 'book_appointment' && !reschedule) return null
+  const args = (parsed.toolArgs ?? {}) as Record<string, unknown>
+  const dateKey = reschedule ? 'new_date' : 'date'
+  const now = new Date(Date.now() + 3 * 3600000)
+  if (args[dateKey] !== now.toISOString().slice(0, 10)) return null
+  const weekday = WEEKDAYS_TR[now.getUTCDay()]
+  const history = Array.isArray(context.history) ? (context.history as { role?: string; content?: unknown }[]) : []
+  const customerText = [message, ...history.filter((h) => h.role === 'user').map((h) => String(h.content ?? ''))]
+    .join('\n')
+    .toLocaleLowerCase('tr')
+  // "pazar" pazartesi'nin, "cuma" cumartesi'nin basi: ayri gun sayilmasin
+  const dayRe = new RegExp(`(^|[^a-zçğıöşü])${weekday.toLocaleLowerCase('tr')}${weekday === 'Pazar' ? '(?!tesi)' : weekday === 'Cuma' ? '(?!rtesi)' : ''}`)
+  if (!dayRe.test(customerText)) return null
+  if (/bug[üu]n|bu (sabah|öğle|akşam)|hemen|şimdi|hafta/.test(customerText)) return null
+  const month = MONTHS[now.getUTCMonth()]
+  if (customerText.includes(`${now.getUTCDate()} ${month.slice(0, 3)}`)) return null
+  // bot bugunu zaten acikca sorduysa ("Bugün 26 Ekim Pazartesi ... uygun mu?") musteri onayladi
+  const lastAssistant = String([...history].reverse().find((h) => h.role === 'assistant')?.content ?? '')
+  if (/bugün/i.test(lastAssistant) || lastAssistant.includes(`${now.getUTCDate()} ${month[0].toLocaleUpperCase('tr')}${month.slice(1)}`)) return null
+  const next = new Date(now.getTime() + 7 * 86400000)
+  const time = String(args[reschedule ? 'new_time' : 'time'] ?? '')
+  if (/^\d{2}:\d{2}$/.test(time) && time <= now.toISOString().slice(11, 16)) {
+    args[dateKey] = next.toISOString().slice(0, 10)
+    return null
+  }
+  const nextMonth = MONTHS[next.getUTCMonth()]
+  return `Bugün mü, yoksa ${next.getUTCDate()} ${nextMonth[0].toLocaleUpperCase('tr')}${nextMonth.slice(1)} ${weekday} ${questionParticle(weekday)}?`
+}
+
 // Model iptal isteginde bazen ayni randevuyu yeniden acmaya calisiyordu (book_appointment;
 // testte 6'da 1) ve musteri "o saat dolu" cevabi aliyordu. Boyle olunca model
 // bir kez duzeltmeyle yeniden sorulur.
@@ -227,9 +263,77 @@ const ECHOED_TYPOS: [RegExp, string][] = [
   [/\b(h)(?:afaya|aftya)(?![a-zçğıöşü])/gi, '$1aftaya'],
   // "Teşekkürler, Derya Kılıç." resmi duruyor; "Derya Hanım" gibi hitap kalir
   [/^Teşekkürler,? [A-ZÇĞİÖŞÜ][a-zçğıöşü]+ [A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?<!Hanım|Bey)([.,!])/, 'Teşekkürler$1'],
+  // bot testinde goruldu: "Siz nasıl yardımcı olabilirim?"
+  [/\b([Ss])iz nasıl yardımcı olabilirim/g, '$1ize nasıl yardımcı olabilirim'],
 ]
 export function fixEchoedTypos(reply: string): string {
   return ECHOED_TYPOS.reduce((s, [re, to]) => s.replace(re, to), reply)
+    // cumle buyuk harfle baslar ("hoş geldiniz. size nasıl" bot testinde goruldu)
+    .replace(/([.!?] )(\p{Ll})/gu, (_, p, ch) => p + ch.toLocaleUpperCase('tr'))
+}
+
+// Musteri emoji kullanmadiysa sohbet cevabindaki emoji silinir ("Günaydın 🌞";
+// talimata ragmen kaliyordu). Sistem kartlarindaki ✅ bu yoldan gecmez.
+export function stripEmoji(reply: string, customerMessage: string): string {
+  if (/\p{Extended_Pictographic}/u.test(customerMessage)) return reply
+  const stripped = reply
+    // iki cumle arasindaki emoji noktaya doner: "Günaydın 🌞 Size..." -> "Günaydın. Size..."
+    .replace(/([.!?,])?\s*\p{Extended_Pictographic}\uFE0F?(\s+)(?=\p{Lu})/gu, (_, p, s) => (p ?? '.') + s)
+    .replace(/\s*\p{Extended_Pictographic}\uFE0F?/gu, '')
+    .trim()
+  if (!stripped) return reply
+  // sondaki emoji gidince cumle noktasiz kalmasin: "... iptal edildi ✅" -> "... iptal edildi."
+  return /[\p{L}\d]$/u.test(stripped) && /\p{Extended_Pictographic}\uFE0F?\s*$/u.test(reply) ? stripped + '.' : stripped
+}
+
+// Model az onceki ✅ islemini bazen inkar ediyordu ("önceki mesajım iptalin
+// sistemde tamamlandığını doğrulamıyor"; bot testinde 8'de 1). Son mesaj ✅
+// kartiysa ve cevap suphe bildiriyorsa islem dogrulanir.
+export function confirmOwnAction(parsed: Json, context: Json): string | null {
+  if (parsed.hasToolCall === true) return null
+  const history = Array.isArray(context.history) ? (context.history as { role?: string; content?: unknown }[]) : []
+  const last = String([...history].reverse().find((h) => h.role === 'assistant')?.content ?? '')
+  const m = last.match(/^(Randevunuz|Randevularınız) (oluşturuldu|iptal edildi|güncellendi) ✅/)
+  if (!m) return null
+  // cevap yine dogrulama olsa da ayni sey yazilir, zarari yok
+  if (!/doğrula|teyit|emin değil|göremiyorum|hatalıydı|yapılmadı|tamamlanmadı|gerçekleşmedi/i.test(String(parsed.chatReply ?? ''))) return null
+  return `Evet, ${m[1].toLocaleLowerCase('tr')} ${m[2]}.`
+}
+
+// Iki randevusu olan musteri "randevumu iptal et" deyince model bazen hangisi
+// oldugunu sormadan "Tam olarak ne yapmamı istersiniz?" diyordu (bot testinde
+// 8'de 1). Cevap randevulardan birini anmiyorsa liste sorusu gider.
+export function vagueCancelQuestion(parsed: Json, message: string, context: Json): string | null {
+  // "iptal ücreti var mı" gibi sorular degil, iptal istegi
+  if (parsed.hasToolCall === true || !/iptal\s*(et|ed|olsun)/i.test(message)) return null
+  const appts = (Array.isArray(context.appointments) ? context.appointments : []) as { service_name?: string }[]
+  if (appts.length < 2) return null
+  const reply = String(parsed.chatReply ?? '').toLocaleLowerCase('tr')
+  if (appts.some((a) => a.service_name && reply.includes(a.service_name.toLocaleLowerCase('tr')))) return null
+  return askWhichCancel({ toolName: 'cancel_appointment' }, message, context)
+}
+
+// gpt-6-luna nadiren ic dusuncesini cevaba karistiriyor ("Selam, ... hoş
+// geldiniz. How can I help? Wait Turkish only. ..."; bot testinde ~600 istekte
+// 2). Ingilizce kelimeler sayilir; "Can" gibi Turkce ad olabilenler listede yok.
+export function looksLikeEnglish(reply: string): boolean {
+  const words = reply.match(/\b(the|and|is|are|should|wait|how|help|but|could|would|maybe|fine|natural|sentences?|reply|english|turkish|greeting|same|short)\b/gi) ?? []
+  // tek basina buyuk "I" (Turkcede "ı"/"i" kucuk yazilir)
+  const selves = reply.match(/\bI\b/g) ?? []
+  return words.length + selves.length >= 3
+}
+
+// Cumle ortasinda hizmet adi kucuk harfle yazilir ("Yarın 24 Ekim fön için");
+// model talimata ragmen "Fön" yaziyordu. Yalniz "Fön", "Kalıcı oje" gibi
+// normal yazilmis adlar; "OPI Manikür" gibi buyuk harfli adlara dokunulmaz.
+export function lowercaseServiceNames(reply: string, services: unknown): string {
+  const names = (Array.isArray(services) ? services : [])
+    .map((s) => String((s as { name?: unknown }).name ?? ''))
+    .filter((n) => /^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?: [A-ZÇĞİÖŞÜa-zçğıöşü][a-zçğıöşü]*)*$/.test(n))
+  return names.reduce(
+    (s, n) => s.replace(new RegExp(`(?<=[a-zçğıöşü\\d,;] )${n}(?![a-zçğıöşü])`, 'g'), n.toLocaleLowerCase('tr')),
+    reply,
+  )
 }
 
 // Saat degisikligi onerisi ("O saat dolu. Randevunuzu taşımak için en yakın
@@ -391,15 +495,26 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
       )
       parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, retry)
     }
+    // ic dusunce karismis cevap musteriye gitmez: bir kez yeniden sorulur,
+    // yine oyleyse kisa bir rica gider
+    if (parsed.hasToolCall !== true && looksLikeEnglish(String(parsed.chatReply ?? ''))) {
+      console.error('chatbot: cevaba ingilizce ic dusunce karisti, yeniden soruluyor', { wamid: input.wamid })
+      const retry = await timed('openai-tekrar', askOpenAI(openaiRequest))
+      parsed = run('Parse OpenAI Response', flow.parseOpenAIResponse as Step, retry)
+      if (parsed.hasToolCall !== true && looksLikeEnglish(String(parsed.chatReply ?? ''))) {
+        parsed = { ...parsed, chatReply: 'Kusura bakmayın, mesajınızı tekrar yazar mısınız?' }
+      }
+    }
   }
   const guardQuestion =
     parsed.hasToolCall === true
       ? (askAboutEarlyHour(parsed, input.message, context) ??
+        askTodayOrNextWeek(parsed, input.message, context) ??
         askForSurname(parsed, input.message, context) ??
         askWhichCancel(parsed, input.message, context) ??
         lateNotice(parsed, input.message, context) ??
         confirmHypotheticalReschedule(parsed, input.message))
-      : null
+      : (vagueCancelQuestion(parsed, input.message, context) ?? confirmOwnAction(parsed, context))
 
   let replyStep: Json
   if (guardQuestion) {
@@ -441,7 +556,11 @@ export async function runChatbot(input: ChatbotInput, deps: ChatbotDeps): Promis
   // Uzun tire (—) WhatsApp'ta insan yazisi gibi durmuyor ("yapay zeka yazmis"
   // hissi); talimata ragmen kalanlar virgule cevrilir. Kayda da temiz hali gider.
   const rawReply = typeof replyStep.reply === 'string' ? replyStep.reply : ''
-  const reply = fixEchoedTypos(rawReply.replace(/\s*[—–]\s*/g, ', ').replace(/,\s*([.?!])/g, '$1'))
+  const cleaned = lowercaseServiceNames(
+    fixEchoedTypos(rawReply.replace(/\s*[—–]\s*/g, ', ').replace(/,\s*([.?!])/g, '$1')),
+    context.services,
+  )
+  const reply = !guardQuestion && parsed.hasToolCall !== true ? stripEmoji(cleaned, input.message) : cleaned
   replyStep.reply = reply
   const log = fn(
     'chatbot-log-message',

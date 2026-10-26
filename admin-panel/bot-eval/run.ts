@@ -175,10 +175,16 @@ async function runScenario(sc: (typeof SCENARIOS)[number], idx: number): Promise
     if (/(çok )?üzüldüm|haklısınız/i.test(b)) failures.push(`uslup: kendi duygusu / suc kabulu: "${b}"`)
     if (/Merhaba, Güzel Salon[.!]/.test(b)) failures.push(`uslup: salonu selamladi: "${b}"`)
     if (/Teşekkürler,? (?!Güzel Salon)[A-ZÇĞİÖŞÜ][a-zçğıöşü]+ [A-ZÇĞİÖŞÜ][a-zçğıöşü]+/.test(b)) failures.push(`uslup: tesekkurde tam ad: "${b}"`)
-    if (/[,;] (Saç kesimi|Fön|Boya|Kaş alımı|Manikür|Kalıcı oje|Pedikür|Protez tırnak|Cilt bakımı|Lazer epilasyon) \d/.test(b))
+    if (/[a-zçğıöşü\d,;] (Saç kesimi|Fön|Boya|Kaş alımı|Manikür|Kalıcı oje|Pedikür|Protez tırnak|Cilt bakımı|Lazer epilasyon)(?![a-zçğıöşü])/.test(b))
       failures.push(`uslup: cumle ortasinda buyuk harfli hizmet: "${b}"`)
-    if (/mesajım hatalıydı|işlem(ler)? yapılmadı|gerçekleştirmedim|onaylanmadı/i.test(b))
+    if (/\b(How can I|Wait|Should|Turkish|English|natural|sentence)\b/.test(b)) failures.push(`ic dusunce / ingilizce karisti: "${b}"`)
+    if (/mesajım hatalıydı|işlem(ler)? yapılmadı|gerçekleştirmedim|onaylanmadı|doğrula(mıyor|yamıyorum)|teyit edemiyorum/i.test(b))
       failures.push(`kendi gercek islemini yalanladi: "${b}"`)
+  }
+  // musteri emoji kullanmadiysa bot da kullanmaz (sistem kartlarindaki ✅ haric)
+  for (const t of turns) {
+    const text = t.bot.replace(/Randevu(nuz|larınız) (oluşturuldu|iptal edildi|güncellendi) ✅/g, '')
+    if (!/\p{Extended_Pictographic}/u.test(t.user) && /\p{Extended_Pictographic}/u.test(text)) failures.push(`uslup: emoji: "${t.bot}"`)
   }
   if (/\bid:|randevu-\d/i.test(all)) failures.push('musteriye ic kimlik (id) yazdi')
   return { id: sc.id, title: sc.title, turns, failures, ms }
