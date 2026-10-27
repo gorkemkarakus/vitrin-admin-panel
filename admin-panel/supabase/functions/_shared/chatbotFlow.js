@@ -1024,7 +1024,8 @@ return [{
     service_name: finalServiceName,
     employee_name: confirmedSuggestion?.employee || toolArgs.employee_name || undefined,
     scheduled_at: scheduledAt,
-    source_note: 'WhatsApp asistanı',
+    // randevu hikayesinde hangi kanaldan geldigi gorunur (Instagram'da "ig:<IGSID>")
+    source_note: String(webhookData.from || '').startsWith('ig:') ? 'Instagram asistanı' : 'WhatsApp asistanı',
     weekday_note: weekdayConflict ? null : weekdayNote,
     date_warning: weekdayConflict || (!explicitDate ? dateWarning : null),
     recurring_note: messagesToCheck.some((m) => /\bher\s+(hafta|ay|gün|hafta[ıi]|ay[ıi])\b|sürekli|düzenli\s+olarak|tekrar\s*eden|tekrarlayan/i.test(m || '')) ? true : null,

@@ -950,3 +950,32 @@ Deno.test('hatirlatma dugmeleri: randevu kimligiyle gider, geri gelince taninir'
   assertEquals(parseAppointmentButton('appt:delete:' + id), null)
   assertEquals(parseAppointmentButton(null), null)
 })
+
+Deno.test('Instagram randevusu: randevu notunda "Instagram asistanı" yazar', async () => {
+  const calls: Call[] = []
+  const r = await runChatbot(
+    { ...input, from: 'ig:17841400000000001', phone_number_id: 'ig:1784', message: '2026-11-03 14:00 fön, Ayşe Demir 05321112233' },
+    deps(
+      fakeFetch(
+        {
+          'chatbot-context': context,
+          openai: openaiTool('book_appointment', {
+            service_name: 'Fön',
+            date: '2026-11-03',
+            time: '14:00',
+            customer_full_name: 'Ayşe Demir',
+            customer_contact_phone: '05321112233',
+          }),
+          'book-appointment': {
+            status: 'booked',
+            appointment: { service_name: 'Fön', scheduled_at: '2026-11-03T11:00:00Z', employee_name: 'Elif Yılmaz' },
+          },
+          'chatbot-log-message': { ok: true },
+        },
+        calls,
+      ),
+    ),
+  )
+  await r.log
+  assertEquals(calls.find((c) => c.url.endsWith('book-appointment'))!.body.source_note, 'Instagram asistanı')
+})
